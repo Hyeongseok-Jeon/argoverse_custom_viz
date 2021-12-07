@@ -10,6 +10,7 @@ import numpy as np
 import importlib.util
 import sys
 from torch.utils.data.distributed import DistributedSampler
+import progressbar
 
 import tkinter
 import tkinter.filedialog
@@ -105,8 +106,9 @@ class MainDialog(QMainWindow, ui_files.gui.Ui_Dialog):
         for j in range(len(self.afl)):
             disp_list.append(np.sum(np.linalg.norm(disp[j], axis=1)))
         I = disp_list.index(min(disp_list))
-        print(disp_list.sort()[:5])
-        return self.data_idx_map[I]
+        disp_list.sort()
+        print(disp_list[:3])
+        return int(self.data_idx_map[I])
 
     def fov_update(self):
         self.fov = int(self.fov_data.text())
@@ -488,16 +490,20 @@ class MainDialog(QMainWindow, ui_files.gui.Ui_Dialog):
         return ade_pred, fde_pred, ade_recon, fde_recon
 
     def data_reform(self):
+        bar = progressbar.ProgressBar(maxval=100, \
+                                      widgets=[progressbar.Bar('=', '[', ']'), ' ', progressbar.Percentage()])
+        bar.start()
         data_list = np.empty([len(self.afl), 50, 2])
         self.data_idx_map = []
         for i in range(len(self.afl)):
+            bar.update(int(100*i/len(self.afl)))
             data_tmp = self.afl[i]
             target_id = data_tmp.seq_df.TRACK_ID[data_tmp.seq_df.OBJECT_TYPE == 'AGENT'].tolist()[0]
             target_traj = np.concatenate([np.expand_dims(data_tmp.seq_df.X[data_tmp.seq_df.TRACK_ID == target_id].to_numpy(), axis=-1),
                                          np.expand_dims(data_tmp.seq_df.Y[data_tmp.seq_df.TRACK_ID == target_id].to_numpy(), axis=-1)], axis=-1).astype(np.float32)
             data_list[i,:,:] = target_traj
             self.data_idx_map.append(data_tmp.current_seq.stem)
-
+        bar.finish()
         target_traj_translation = preprocess(data_list)
         self.target_traj_converted = preprocess_dir(target_traj_translation)
 
