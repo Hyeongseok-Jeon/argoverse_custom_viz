@@ -65,6 +65,7 @@ class MainDialog(QMainWindow, ui_files.gui.Ui_Dialog):
         self.y_offset_data.returnPressed.connect(self.fov_update)
         self.idx_data.returnPressed.connect(self.idx_update)
         self.data_dir_data.returnPressed.connect(self.index_update)
+        self.data_reform()
 
     def data_load(self):
         root = tkinter.Tk()
@@ -75,11 +76,10 @@ class MainDialog(QMainWindow, ui_files.gui.Ui_Dialog):
         self.row_index = np.where(self.data[:, 0, 0, -1] == 1)[0][0]
         self.dataInfo.setText(data_file + ' is loaded successfully')
         self.data_num.setText(str(self.data.shape[0]))
-
         self.data_update(self.row_index)
 
     def data_update(self, row_index):
-        self.data_index = int(self.data[row_index, 0, 0, -1])
+        self.data_index = self.find_original_index(row_index)
         self.cur_data = self.afl.get(self.original_data_dir + '/' + str(self.data_index) + '.csv')
         self.idx_data.setText(str(row_index))
         self.data_dir_data.setText(str(self.cur_data.current_seq))
@@ -88,16 +88,25 @@ class MainDialog(QMainWindow, ui_files.gui.Ui_Dialog):
 
         self.ego_hist = np.concatenate([np.expand_dims(self.cur_data.seq_df.X[self.cur_data.seq_df.TRACK_ID == ego_id][:20].to_numpy(), axis=-1),
                                         np.expand_dims(self.cur_data.seq_df.Y[self.cur_data.seq_df.TRACK_ID == ego_id][:20].to_numpy(), axis=-1)], axis=-1).astype(np.float32)
-        self.ego_fut = np.concatenate([np.expand_dims(self.cur_data.seq_df.X[self.cur_data.seq_df.TRACK_ID == ego_id][21:].to_numpy(), axis=-1),
-                                       np.expand_dims(self.cur_data.seq_df.Y[self.cur_data.seq_df.TRACK_ID == ego_id][21:].to_numpy(), axis=-1)], axis=-1).astype(np.float32)
+        self.ego_fut = np.concatenate([np.expand_dims(self.cur_data.seq_df.X[self.cur_data.seq_df.TRACK_ID == ego_id][19:].to_numpy(), axis=-1),
+                                       np.expand_dims(self.cur_data.seq_df.Y[self.cur_data.seq_df.TRACK_ID == ego_id][19:].to_numpy(), axis=-1)], axis=-1).astype(np.float32)
         self.target_hist = np.concatenate([np.expand_dims(self.cur_data.seq_df.X[self.cur_data.seq_df.TRACK_ID == target_id][:20].to_numpy(), axis=-1),
                                            np.expand_dims(self.cur_data.seq_df.Y[self.cur_data.seq_df.TRACK_ID == target_id][:20].to_numpy(), axis=-1)], axis=-1).astype(np.float32)
-        self.target_fut = np.concatenate([np.expand_dims(self.cur_data.seq_df.X[self.cur_data.seq_df.TRACK_ID == target_id][21:].to_numpy(), axis=-1),
-                                          np.expand_dims(self.cur_data.seq_df.Y[self.cur_data.seq_df.TRACK_ID == target_id][21:].to_numpy(), axis=-1)], axis=-1).astype(np.float32)
+        self.target_fut = np.concatenate([np.expand_dims(self.cur_data.seq_df.X[self.cur_data.seq_df.TRACK_ID == target_id][19:].to_numpy(), axis=-1),
+                                          np.expand_dims(self.cur_data.seq_df.Y[self.cur_data.seq_df.TRACK_ID == target_id][19:].to_numpy(), axis=-1)], axis=-1).astype(np.float32)
         self.GT = self.data[row_index, 1, :, :2]
         self.prediction = self.data[row_index, 0, :, :2]
         self.city = self.cur_data.seq_df.CITY_NAME[0]
         self.visualization()
+
+    def find_original_index(self, row_index):
+        disp = self.target_traj_converted[:, 20:, :] - self.data[row_index, 1, :, :2]
+        disp_list = []
+        for j in range(len(self.afl)):
+            disp_list.append(np.sum(np.linalg.norm(disp[j], axis=1)))
+        I = disp_list.index(min(disp_list))
+        print(disp_list.sort()[:5])
+        return self.data_idx_map[I]
 
     def fov_update(self):
         self.fov = int(self.fov_data.text())
@@ -166,36 +175,18 @@ class MainDialog(QMainWindow, ui_files.gui.Ui_Dialog):
         ymax = ego_cur_pos[1] + self.fov/2 + self.y_offset
         city_name = self.city
 
-        local_lane_polygons = am.find_local_lane_polygons([xmin, xmax, ymin, ymax], city_name)
+        local_lane_polygons = am.find_local_lane_polygons([xmin-self.fov/2, xmax+self.fov/2, ymin-self.fov/2, ymax+self.fov/2], city_name)
         draw_lane_polygons(self.pred_plot.canvas.ax, local_lane_polygons, color='darkgray')
-        self.pred_plot.canvas.ax.axis('equal')
-        self.pred_plot.canvas.ax.set_xlim([xmin.item(), xmax.item()])
-        self.pred_plot.canvas.ax.set_ylim([ymin.item(), ymax.item()])
-        self.pred_plot.canvas.draw()
-        # raw_data = []
-        # with open(self.data_dir + self.cur_data['file_name'][0], newline='') as csvfile:
-        #     spamreader = csv.reader(csvfile, delimiter=' ', quotechar='|')
-        #     for row in spamreader:
-        #         raw_data.append(row)
-        # raw_data = raw_data[1:]
-        # x = np.asarray([float(raw_data[i][0].split(',')[3]) for i in range(len(raw_data))])
-        # y = np.asarray([float(raw_data[i][0].split(',')[4]) for i in range(len(raw_data))])
-        # veh_class = [raw_data[i][0].split(',')[2] for i in range(len(raw_data))]
-        # time_stamp = [raw_data[i][0].split(',')[0] for i in range(len(raw_data))]
-        # ego_index = [i for i, x in enumerate(veh_class) if x == 'AV']
-        # ego_x = x[ego_index]
-        # ego_y = y[ego_index]
-        # ego_hist_x = ego_x[:20]
-        # ego_hist_y = ego_y[:20]
-        # ego_fut_x = ego_x[19:40]
-        # ego_fut_y = ego_y[19:40]
-        # target_index = [i for i, x in enumerate(veh_class) if x == 'AGENT']
-        # target_x = x[target_index]
-        # target_y = y[target_index]
-        # target_hist_x = target_x[:20]
-        # target_hist_y = target_y[:20]
-        # target_fut_x = target_x[19:40]
-        # target_fut_y = target_y[19:40]
+
+        ego_hist_x = self.ego_hist[:,0]
+        ego_hist_y = self.ego_hist[:,1]
+        ego_fut_x = self.ego_fut[:,0]
+        ego_fut_y = self.ego_fut[:,1]
+        target_hist_x = self.target_hist[:,0]
+        target_hist_y = self.target_hist[:,1]
+        target_fut_x = self.target_fut[:,0]
+        target_fut_y = self.target_fut[:,1]
+
         # cur_time = raw_data[ego_index[19]][0].split(',')[0]
         # cur_sur_index = [i for i, x in enumerate(time_stamp) if x == cur_time]
         # sur_x = x[cur_sur_index]
@@ -207,30 +198,21 @@ class MainDialog(QMainWindow, ui_files.gui.Ui_Dialog):
         # self.pred_plot_5.canvas.ax.scatter(sur_x, sur_y, color='silver')
         # self.pred_plot_0.canvas.ax.scatter(sur_x, sur_y, color='silver')
         #
-        # self.pred_plot_1.canvas.ax.plot(ego_hist_x, ego_hist_y, '-', color='red')
-        # self.pred_plot_1.canvas.ax.scatter(ego_hist_x[-1], ego_hist_y[-1], color='red')
-        # self.pred_plot_1.canvas.ax.plot(target_hist_x, target_hist_y, '-', color='blue')
-        # self.pred_plot_1.canvas.ax.scatter(target_hist_x[-1], target_hist_y[-1], color='blue')
-        # self.pred_plot_2.canvas.ax.plot(ego_hist_x, ego_hist_y, '-', color='red')
-        # self.pred_plot_2.canvas.ax.scatter(ego_hist_x[-1], ego_hist_y[-1], color='red')
-        # self.pred_plot_2.canvas.ax.plot(target_hist_x, target_hist_y, '-', color='blue')
-        # self.pred_plot_2.canvas.ax.scatter(target_hist_x[-1], target_hist_y[-1], color='blue')
-        # self.pred_plot_3.canvas.ax.plot(ego_hist_x, ego_hist_y, '-', color='red')
-        # self.pred_plot_3.canvas.ax.scatter(ego_hist_x[-1], ego_hist_y[-1], color='red')
-        # self.pred_plot_3.canvas.ax.plot(target_hist_x, target_hist_y, '-', color='blue')
-        # self.pred_plot_3.canvas.ax.scatter(target_hist_x[-1], target_hist_y[-1], color='blue')
-        # self.pred_plot_4.canvas.ax.plot(ego_hist_x, ego_hist_y, '-', color='red')
-        # self.pred_plot_4.canvas.ax.scatter(ego_hist_x[-1], ego_hist_y[-1], color='red')
-        # self.pred_plot_4.canvas.ax.plot(target_hist_x, target_hist_y, '-', color='blue')
-        # self.pred_plot_4.canvas.ax.scatter(target_hist_x[-1], target_hist_y[-1], color='blue')
-        # self.pred_plot_5.canvas.ax.plot(ego_hist_x, ego_hist_y, '-', color='red')
-        # self.pred_plot_5.canvas.ax.scatter(ego_hist_x[-1], ego_hist_y[-1], color='red')
-        # self.pred_plot_5.canvas.ax.plot(target_hist_x, target_hist_y, '-', color='blue')
-        # self.pred_plot_5.canvas.ax.scatter(target_hist_x[-1], target_hist_y[-1], color='blue')
-        # self.pred_plot_0.canvas.ax.plot(ego_hist_x, ego_hist_y, '-', color='red')
-        # self.pred_plot_0.canvas.ax.scatter(ego_hist_x[-1], ego_hist_y[-1], color='red')
-        # self.pred_plot_0.canvas.ax.plot(target_hist_x, target_hist_y, '-', color='blue')
-        # self.pred_plot_0.canvas.ax.scatter(target_hist_x[-1], target_hist_y[-1], color='blue')
+        self.pred_plot.canvas.ax.plot(ego_hist_x, ego_hist_y, '-', color='red')
+        self.pred_plot.canvas.ax.scatter(ego_hist_x[-1], ego_hist_y[-1], color='red')
+        self.pred_plot.canvas.ax.plot(target_hist_x, target_hist_y, '-', color='blue')
+        self.pred_plot.canvas.ax.scatter(target_hist_x[-1], target_hist_y[-1], color='blue')
+        self.pred_plot.canvas.ax.plot(ego_fut_x, ego_fut_y, '-', color='red')
+        self.pred_plot.canvas.ax.scatter(ego_fut_x[-1], ego_fut_y[-1], color='red')
+        self.pred_plot.canvas.ax.plot(target_fut_x, target_fut_y, '-', color='blue')
+        self.pred_plot.canvas.ax.scatter(target_fut_x[-1], target_fut_y[-1], color='blue')
+
+        self.pred_plot.canvas.ax.axis('equal')
+        self.pred_plot.canvas.ax.set_xlim([xmin.item(), xmax.item()])
+        self.pred_plot.canvas.ax.set_ylim([ymin.item(), ymax.item()])
+        self.pred_plot.canvas.draw()
+
+
         #
         # ego_aug = self.cur_data['ego_aug'][0]['traj'].numpy().copy()
         # ego_aug = np.concatenate([ego_aug, np.zeros_like(ego_aug[:, 0:1, :])], axis=1)
@@ -495,35 +477,6 @@ class MainDialog(QMainWindow, ui_files.gui.Ui_Dialog):
         # # self.pred_plot_5.canvas.ax.axis('equal')
         # self.pred_plot_0.canvas.draw()
 
-    def scenario_play(self):
-        data = self.state_for_play
-        scene_id = self.idx_data_1.text()
-        for i in range(data.shape[0]):
-            trajs = data[i]
-            ego_cur_pos = self.cur_data['gt_preds'][0][0, 0, :]
-            xmin_0 = ego_cur_pos[0] - self.fov_0 + self.x_offset_0
-            xmax_0 = ego_cur_pos[0] + self.fov_0 + self.x_offset_0
-            ymin_0 = ego_cur_pos[1] - self.fov_0 + self.y_offset_0
-            ymax_0 = ego_cur_pos[1] + self.fov_0 + self.y_offset_0
-            city_name = self.cur_data['city'][0]
-            local_lane_polygons_0 = am.find_local_lane_polygons([xmin_0, xmax_0, ymin_0, ymax_0], city_name)
-            for t in range(40):
-                print(t)
-                self.pred_plot_0.canvas.ax.clear()
-                draw_lane_polygons(self.pred_plot_0.canvas.ax, local_lane_polygons_0, color='darkgray')
-                self.pred_plot_0.canvas.ax.plot(trajs[0, :t + 1, 0], trajs[0, :t + 1, 1], '-', color='red')
-                self.pred_plot_0.canvas.ax.plot(trajs[1, :t + 1, 0], trajs[1, :t + 1, 1], '-', color='blue')
-                self.pred_plot_0.canvas.ax.scatter(trajs[0, t, 0], trajs[0, t, 1], 50, marker="o", facecolors='none', edgecolors='red')
-                self.pred_plot_0.canvas.ax.scatter(trajs[1, t, 0], trajs[1, t, 1], 50, marker="o", facecolors='none', edgecolors='blue')
-                self.pred_plot_0.canvas.ax.set_xlim([xmin_0.item(), xmax_0.item()])
-                self.pred_plot_0.canvas.ax.set_ylim([ymin_0.item(), ymax_0.item()])
-                self.pred_plot_0.canvas.draw()
-                buf = self.pred_plot_0.canvas.buffer_rgba()
-                X = np.asarray(buf)
-                im = Image.fromarray(X)
-                name = 'plot/' + scene_id + '_' + str(i) + '_' + str(t) + '.png'
-                im.save(name)
-
     def get_eval_data_1(self):
         pred_err = torch.norm(self.pred_gt[0] - self.pred_out_1[0], dim=1)
         ade_pred = torch.mean(pred_err)
@@ -534,6 +487,44 @@ class MainDialog(QMainWindow, ui_files.gui.Ui_Dialog):
         fde_recon = torch.mean(recon_err[:, -1])
         return ade_pred, fde_pred, ade_recon, fde_recon
 
+    def data_reform(self):
+        data_list = np.empty([len(self.afl), 50, 2])
+        self.data_idx_map = []
+        for i in range(len(self.afl)):
+            data_tmp = self.afl[i]
+            target_id = data_tmp.seq_df.TRACK_ID[data_tmp.seq_df.OBJECT_TYPE == 'AGENT'].tolist()[0]
+            target_traj = np.concatenate([np.expand_dims(data_tmp.seq_df.X[data_tmp.seq_df.TRACK_ID == target_id].to_numpy(), axis=-1),
+                                         np.expand_dims(data_tmp.seq_df.Y[data_tmp.seq_df.TRACK_ID == target_id].to_numpy(), axis=-1)], axis=-1).astype(np.float32)
+            data_list[i,:,:] = target_traj
+            self.data_idx_map.append(data_tmp.current_seq.stem)
+
+        target_traj_translation = preprocess(data_list)
+        self.target_traj_converted = preprocess_dir(target_traj_translation)
+
+
+
+def preprocess_dir(data):
+    k = len(data)
+    rotation_beta = np.empty([k])
+    rot_data = np.empty([k, 50, 2])
+    for i in range(k):
+        dir = data[i, 20, :] - data[i, 19, :]
+        rotation_beta[i] = np.arctan2(dir[1], dir[0])
+        rotation_beta[i] = np.pi / 2. - rotation_beta[i]
+        c, s = np.cos(rotation_beta[i]), np.sin(rotation_beta[i])
+        R = np.array(((c, -s), (s, c)))
+        for j in range(50):
+            rot_data[i, j, :] = np.matmul(R, data[i, j, :])
+    return rot_data
+
+def preprocess(data):
+    k = len(data)
+    trans_data = np.empty([k, 50, 2])
+    for i in range(k):
+        median = data[i, 19, :].copy()
+        for j in range(50):
+            trans_data[i, j, :] = data[i, j, :] - median
+    return trans_data
 
 def sync(data):
     data_list = comm.allgather(data)
