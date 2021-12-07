@@ -50,7 +50,7 @@ class MainDialog(QMainWindow, ui_files.gui.Ui_Dialog):
 
         self.loadData.clicked.connect(self.data_load)
         self.next_idx.clicked.connect(self.next)
-
+        self.prev_idx.clicked.connect(self.prev)
         # self.pause.clocked.connect(self.pause)
         # self.stop.clicked.connect(self.stop)
 
@@ -97,6 +97,7 @@ class MainDialog(QMainWindow, ui_files.gui.Ui_Dialog):
         self.GT = self.data[row_index, 1, :, :2]
         self.prediction = self.data[row_index, 0, :, :2]
         self.city = self.cur_data.seq_df.CITY_NAME[0]
+        self.visualization()
 
     def fov_update(self):
         self.fov = int(self.fov_data.text())
@@ -113,7 +114,7 @@ class MainDialog(QMainWindow, ui_files.gui.Ui_Dialog):
             self.data_update(self.row_index)
 
     def index_update(self):
-        target_index = self.data_dir_data.text()
+        target_index = float(self.data_dir_data.text())
         row_index_cand = np.where(self.data[:, 0, 0, -1] == target_index)[0]
         if len(row_index_cand) > 0:
             self.row_index = np.where(self.data[:, 0, 0, -1] == target_index)[0][0]
@@ -136,501 +137,363 @@ class MainDialog(QMainWindow, ui_files.gui.Ui_Dialog):
                 except:
                     pass
 
-
-    def update_data(self):
-        self.map_data_1.setText(self.cur_data['city'][0])
-        self.map_data_2.setText(self.cur_data['city'][0])
-        self.map_data_3.setText(self.cur_data['city'][0])
-        self.map_data_4.setText(self.cur_data['city'][0])
-        self.map_data_5.setText(self.cur_data['city'][0])
-        self.map_data_0.setText(self.cur_data['city'][0])
-        self.num_of_vehicles_data_1.setText(str(self.cur_data['gt_preds'][0].shape[0]))
-        self.num_of_vehicles_data_2.setText(str(self.cur_data['gt_preds'][0].shape[0]))
-        self.num_of_vehicles_data_3.setText(str(self.cur_data['gt_preds'][0].shape[0]))
-        self.num_of_vehicles_data_4.setText(str(self.cur_data['gt_preds'][0].shape[0]))
-        self.num_of_vehicles_data_5.setText(str(self.cur_data['gt_preds'][0].shape[0]))
-        self.num_of_vehicles_data_0.setText(str(self.cur_data['gt_preds'][0].shape[0]))
-        self.idx_data_1.setText(str(self.cur_data['idx'][0]))
-        self.idx_data_2.setText(str(self.cur_data['idx'][0]))
-        self.idx_data_3.setText(str(self.cur_data['idx'][0]))
-        self.idx_data_4.setText(str(self.cur_data['idx'][0]))
-        self.idx_data_5.setText(str(self.cur_data['idx'][0]))
-        self.idx_data_0.setText(str(self.cur_data['idx'][0]))
-
-        ego_aug = self.cur_data['ego_aug'][0]['traj']
-        self.pred_gt = self.cur_data['gt_preds'][0][1:2]
-        self.recon_gt = torch.cat([self.cur_data['gt_preds'][0][0:1, :, :], ego_aug])
-        self.show_predict_1.setChecked(True)
-        self.show_predict_2.setChecked(True)
-        self.show_predict_3.setChecked(True)
-        self.show_predict_4.setChecked(True)
-        self.show_predict_5.setChecked(True)
-        with torch.no_grad():
-            out1 = self.net_1(self.cur_data)
-            out2 = self.net_2(self.cur_data)
-            out3 = self.net_3(self.cur_data)
-            out4 = self.net_4(self.cur_data)
-            out5 = self.net_5(self.cur_data)
-        out5 = self.out_mod(out5)
-        self.pred_out_1 = torch.cat([out1[0]['reg'][i][1:2, 0, :, :].cpu() for i in range(len(out1[0]['reg']))])
-        self.pred_out_2 = torch.cat([out2[0]['reg'][i][1:2, 0, :, :].cpu() for i in range(len(out2[0]['reg']))])
-        self.pred_out_3 = torch.cat([out3[0]['reg'][i][1:2, 0, :, :].cpu() for i in range(len(out3[0]['reg']))])
-        self.pred_out_4 = torch.cat([out4[0]['reg'][i][1:2, 0, :, :].cpu() for i in range(len(out4[0]['reg']))])
-        self.pred_out_5 = torch.cat([out5[0]['reg'][i][1:2, 0, :, :].cpu() for i in range(len(out5[0]['reg']))])
-        self.recon_out_1 = torch.cat([out1[0]['reconstruction'][i].unsqueeze(0).cpu() for i in range(len(out1[0]['reconstruction']))])
-        self.recon_out_2 = torch.cat([out2[0]['reconstruction'][i].unsqueeze(0).cpu() for i in range(len(out2[0]['reconstruction']))])
-        self.recon_out_3 = torch.cat([out3[0]['reconstruction'][i].unsqueeze(0).cpu() for i in range(len(out3[0]['reconstruction']))])
-        self.recon_out_4 = torch.cat([out4[0]['reconstruction'][i].unsqueeze(0).cpu() for i in range(len(out4[0]['reconstruction']))])
-        self.recon_out_5 = torch.cat([out5[0]['reconstruction'][i].unsqueeze(0).cpu() for i in range(len(out5[0]['reconstruction']))])
-
-        for i in range(9):
-            if i < self.pred_out_1.shape[0]:
-                self.cand_toggles_1[i].setEnabled(True)
-                self.cand_toggles_1[i].setChecked(True)
-                self.cand_toggles_2[i].setEnabled(True)
-                self.cand_toggles_2[i].setChecked(True)
-                self.cand_toggles_3[i].setEnabled(True)
-                self.cand_toggles_3[i].setChecked(True)
-                self.cand_toggles_4[i].setEnabled(True)
-                self.cand_toggles_4[i].setChecked(True)
-                self.cand_toggles_5[i].setEnabled(True)
-                self.cand_toggles_5[i].setChecked(True)
+    def prev(self):
+        while True:
+            cur_idx = self.data_index
+            cur_idx = cur_idx - 1
+            row_index_cand = np.where(self.data[:, 0, 0, -1] == cur_idx)[0]
+            self.idx_data.setText(str(row_index_cand))
+            if cur_idx == 0:
+                self.idx_data.setText('no previous data')
+                self.data_dir_data.setText('no previous data')
+                self.data_index = 0
+                break
             else:
-                self.cand_toggles_1[i].setEnabled(False)
-                self.cand_toggles_1[i].setChecked(False)
-                self.cand_toggles_2[i].setEnabled(False)
-                self.cand_toggles_2[i].setChecked(False)
-                self.cand_toggles_3[i].setEnabled(False)
-                self.cand_toggles_3[i].setChecked(False)
-                self.cand_toggles_4[i].setEnabled(False)
-                self.cand_toggles_4[i].setChecked(False)
-                self.cand_toggles_5[i].setEnabled(False)
-                self.cand_toggles_5[i].setChecked(False)
-
-        ade_pred_1, fde_pred_1, ade_recon_1, fde_recon_1 = self.get_eval_data_1()
-        ade_pred_2, fde_pred_2, ade_recon_2, fde_recon_2 = self.get_eval_data_2()
-        ade_pred_3, fde_pred_3, ade_recon_3, fde_recon_3 = self.get_eval_data_3()
-        ade_pred_4, fde_pred_4, ade_recon_4, fde_recon_4 = self.get_eval_data_4()
-        ade_pred_5, fde_pred_5, ade_recon_5, fde_recon_5 = self.get_eval_data_5()
-
-        self.ade_pred_1.setText(str(ade_pred_1.item())[:5])
-        self.fde_pred_1.setText(str(fde_pred_1.item())[:5])
-        self.ade_recon_1.setText(str(ade_recon_1.item())[:5])
-        self.fde_recon_1.setText(str(fde_recon_1.item())[:5])
-        self.ade_pred_2.setText(str(ade_pred_2.item())[:5])
-        self.fde_pred_2.setText(str(fde_pred_2.item())[:5])
-        self.ade_recon_2.setText(str(ade_recon_2.item())[:5])
-        self.fde_recon_2.setText(str(fde_recon_2.item())[:5])
-        self.ade_pred_3.setText(str(ade_pred_3.item())[:5])
-        self.fde_pred_3.setText(str(fde_pred_3.item())[:5])
-        self.ade_recon_3.setText(str(ade_recon_3.item())[:5])
-        self.fde_recon_3.setText(str(fde_recon_3.item())[:5])
-        self.ade_pred_4.setText(str(ade_pred_4.item())[:5])
-        self.fde_pred_4.setText(str(fde_pred_4.item())[:5])
-        self.ade_recon_4.setText(str(ade_recon_4.item())[:5])
-        self.fde_recon_4.setText(str(fde_recon_4.item())[:5])
-        self.ade_pred_5.setText(str(ade_pred_5.item())[:5])
-        self.fde_pred_5.setText(str(fde_pred_5.item())[:5])
-        self.ade_recon_5.setText(str(ade_recon_5.item())[:5])
-        self.fde_recon_5.setText(str(fde_recon_5.item())[:5])
-        # self.update_table()
-        self.visualization()
-
-    def out_mod(self, out):
-        ele1 = out[0]
-        ele2 = out[1]
-        ele3 = out[2]
-        ele4 = out[3]
-        # self.pred_out_5 = torch.cat([out5[0]['reg'][i][1:2, 0, :, :].cpu() for i in range(len(out5[0]['reg']))])
-
-        target = ele1['reg'][0][1:2, 0, 0, :]
-        for i in range(len(ele1['reg'])):
-            displacement = target - ele1['reg'][i][1:2, 0, 0, :]
-            ele1['reg'][i][1:2, 0, :, :] = ele1['reg'][i][1:2, 0, :, :] + displacement
-        out_mod = (ele1, ele2, ele3, ele4)
-        return out_mod
-
-    def update_table(self):
-        self.tableWidget.clear()
-        for i in range(4):
-            if i < len(self.pred_out):
-                pred_out = self.pred_out[i]
-                best_idx = np.argmax(pred_out['cls'][0][0].cpu().detach().numpy())
-                pred_reg = pred_out['reg'][0][0, best_idx, :, :]
-                x = pred_reg[:, 0].cpu()
-                y = pred_reg[:, 1].cpu()
-                for j in range(30):
-                    self.tableWidget.setItem(j, 2 * i, QTableWidgetItem(str(x[j].item())))
-                    self.tableWidget.setItem(j, 2 * i + 1, QTableWidgetItem(str(y[j].item())))
+                if len(row_index_cand) > 0:
+                    try:
+                        self.row_index = np.where(self.data[:, 0, 0, -1] == cur_idx)[0][0]
+                        self.data_update(self.row_index)
+                        break
+                    except:
+                        pass
 
     def visualization(self):
-        self.pred_plot_1.canvas.ax.clear()
-        self.pred_plot_2.canvas.ax.clear()
-        self.pred_plot_3.canvas.ax.clear()
-        self.pred_plot_4.canvas.ax.clear()
-        self.pred_plot_5.canvas.ax.clear()
-        self.pred_plot_0.canvas.ax.clear()
-        ego_cur_pos = self.cur_data['gt_preds'][0][0, 0, :]
-        xmin_1 = ego_cur_pos[0] - self.fov_1 + self.x_offset_1
-        xmax_1 = ego_cur_pos[0] + self.fov_1 + self.x_offset_1
-        ymin_1 = ego_cur_pos[1] - self.fov_1 + self.y_offset_1
-        ymax_1 = ego_cur_pos[1] + self.fov_1 + self.y_offset_1
-        xmin_2 = ego_cur_pos[0] - self.fov_2 + self.x_offset_2
-        xmax_2 = ego_cur_pos[0] + self.fov_2 + self.x_offset_2
-        ymin_2 = ego_cur_pos[1] - self.fov_2 + self.y_offset_2
-        ymax_2 = ego_cur_pos[1] + self.fov_2 + self.y_offset_2
-        xmin_3 = ego_cur_pos[0] - self.fov_3 + self.x_offset_3
-        xmax_3 = ego_cur_pos[0] + self.fov_3 + self.x_offset_3
-        ymin_3 = ego_cur_pos[1] - self.fov_3 + self.y_offset_3
-        ymax_3 = ego_cur_pos[1] + self.fov_3 + self.y_offset_3
-        xmin_4 = ego_cur_pos[0] - self.fov_4 + self.x_offset_4
-        xmax_4 = ego_cur_pos[0] + self.fov_4 + self.x_offset_4
-        ymin_4 = ego_cur_pos[1] - self.fov_4 + self.y_offset_4
-        ymax_4 = ego_cur_pos[1] + self.fov_4 + self.y_offset_4
-        xmin_5 = ego_cur_pos[0] - self.fov_5 + self.x_offset_5
-        xmax_5 = ego_cur_pos[0] + self.fov_5 + self.x_offset_5
-        ymin_5 = ego_cur_pos[1] - self.fov_5 + self.y_offset_5
-        ymax_5 = ego_cur_pos[1] + self.fov_5 + self.y_offset_5
-        xmin_0 = ego_cur_pos[0] - self.fov_0 + self.x_offset_0
-        xmax_0 = ego_cur_pos[0] + self.fov_0 + self.x_offset_0
-        ymin_0 = ego_cur_pos[1] - self.fov_0 + self.y_offset_0
-        ymax_0 = ego_cur_pos[1] + self.fov_0 + self.y_offset_0
-        city_name = self.cur_data['city'][0]
-        local_lane_polygons_1 = am.find_local_lane_polygons([xmin_1, xmax_1, ymin_1, ymax_1], city_name)
-        local_lane_polygons_2 = am.find_local_lane_polygons([xmin_2, xmax_2, ymin_2, ymax_2], city_name)
-        local_lane_polygons_3 = am.find_local_lane_polygons([xmin_3, xmax_3, ymin_3, ymax_3], city_name)
-        local_lane_polygons_4 = am.find_local_lane_polygons([xmin_4, xmax_4, ymin_4, ymax_4], city_name)
-        local_lane_polygons_5 = am.find_local_lane_polygons([xmin_5, xmax_5, ymin_5, ymax_5], city_name)
-        local_lane_polygons_0 = am.find_local_lane_polygons([xmin_0, xmax_0, ymin_0, ymax_0], city_name)
-        draw_lane_polygons(self.pred_plot_1.canvas.ax, local_lane_polygons_1, color='darkgray')
-        draw_lane_polygons(self.pred_plot_2.canvas.ax, local_lane_polygons_2, color='darkgray')
-        draw_lane_polygons(self.pred_plot_3.canvas.ax, local_lane_polygons_3, color='darkgray')
-        draw_lane_polygons(self.pred_plot_4.canvas.ax, local_lane_polygons_4, color='darkgray')
-        draw_lane_polygons(self.pred_plot_5.canvas.ax, local_lane_polygons_5, color='darkgray')
-        draw_lane_polygons(self.pred_plot_0.canvas.ax, local_lane_polygons_0, color='darkgray')
+        self.pred_plot.canvas.ax.clear()
+        ego_cur_pos = self.ego_hist[-1,:]
+        xmin = ego_cur_pos[0] - self.fov/2 + self.x_offset
+        xmax = ego_cur_pos[0] + self.fov/2 + self.x_offset
+        ymin = ego_cur_pos[1] - self.fov/2 + self.y_offset
+        ymax = ego_cur_pos[1] + self.fov/2 + self.y_offset
+        city_name = self.city
 
-        raw_data = []
-        with open(self.data_dir + self.cur_data['file_name'][0], newline='') as csvfile:
-            spamreader = csv.reader(csvfile, delimiter=' ', quotechar='|')
-            for row in spamreader:
-                raw_data.append(row)
-        raw_data = raw_data[1:]
-        x = np.asarray([float(raw_data[i][0].split(',')[3]) for i in range(len(raw_data))])
-        y = np.asarray([float(raw_data[i][0].split(',')[4]) for i in range(len(raw_data))])
-        veh_class = [raw_data[i][0].split(',')[2] for i in range(len(raw_data))]
-        time_stamp = [raw_data[i][0].split(',')[0] for i in range(len(raw_data))]
-        ego_index = [i for i, x in enumerate(veh_class) if x == 'AV']
-        ego_x = x[ego_index]
-        ego_y = y[ego_index]
-        ego_hist_x = ego_x[:20]
-        ego_hist_y = ego_y[:20]
-        ego_fut_x = ego_x[19:40]
-        ego_fut_y = ego_y[19:40]
-        target_index = [i for i, x in enumerate(veh_class) if x == 'AGENT']
-        target_x = x[target_index]
-        target_y = y[target_index]
-        target_hist_x = target_x[:20]
-        target_hist_y = target_y[:20]
-        target_fut_x = target_x[19:40]
-        target_fut_y = target_y[19:40]
-        cur_time = raw_data[ego_index[19]][0].split(',')[0]
-        cur_sur_index = [i for i, x in enumerate(time_stamp) if x == cur_time]
-        sur_x = x[cur_sur_index]
-        sur_y = y[cur_sur_index]
-        self.pred_plot_1.canvas.ax.scatter(sur_x, sur_y, color='silver')
-        self.pred_plot_2.canvas.ax.scatter(sur_x, sur_y, color='silver')
-        self.pred_plot_3.canvas.ax.scatter(sur_x, sur_y, color='silver')
-        self.pred_plot_4.canvas.ax.scatter(sur_x, sur_y, color='silver')
-        self.pred_plot_5.canvas.ax.scatter(sur_x, sur_y, color='silver')
-        self.pred_plot_0.canvas.ax.scatter(sur_x, sur_y, color='silver')
-
-        self.pred_plot_1.canvas.ax.plot(ego_hist_x, ego_hist_y, '-', color='red')
-        self.pred_plot_1.canvas.ax.scatter(ego_hist_x[-1], ego_hist_y[-1], color='red')
-        self.pred_plot_1.canvas.ax.plot(target_hist_x, target_hist_y, '-', color='blue')
-        self.pred_plot_1.canvas.ax.scatter(target_hist_x[-1], target_hist_y[-1], color='blue')
-        self.pred_plot_2.canvas.ax.plot(ego_hist_x, ego_hist_y, '-', color='red')
-        self.pred_plot_2.canvas.ax.scatter(ego_hist_x[-1], ego_hist_y[-1], color='red')
-        self.pred_plot_2.canvas.ax.plot(target_hist_x, target_hist_y, '-', color='blue')
-        self.pred_plot_2.canvas.ax.scatter(target_hist_x[-1], target_hist_y[-1], color='blue')
-        self.pred_plot_3.canvas.ax.plot(ego_hist_x, ego_hist_y, '-', color='red')
-        self.pred_plot_3.canvas.ax.scatter(ego_hist_x[-1], ego_hist_y[-1], color='red')
-        self.pred_plot_3.canvas.ax.plot(target_hist_x, target_hist_y, '-', color='blue')
-        self.pred_plot_3.canvas.ax.scatter(target_hist_x[-1], target_hist_y[-1], color='blue')
-        self.pred_plot_4.canvas.ax.plot(ego_hist_x, ego_hist_y, '-', color='red')
-        self.pred_plot_4.canvas.ax.scatter(ego_hist_x[-1], ego_hist_y[-1], color='red')
-        self.pred_plot_4.canvas.ax.plot(target_hist_x, target_hist_y, '-', color='blue')
-        self.pred_plot_4.canvas.ax.scatter(target_hist_x[-1], target_hist_y[-1], color='blue')
-        self.pred_plot_5.canvas.ax.plot(ego_hist_x, ego_hist_y, '-', color='red')
-        self.pred_plot_5.canvas.ax.scatter(ego_hist_x[-1], ego_hist_y[-1], color='red')
-        self.pred_plot_5.canvas.ax.plot(target_hist_x, target_hist_y, '-', color='blue')
-        self.pred_plot_5.canvas.ax.scatter(target_hist_x[-1], target_hist_y[-1], color='blue')
-        self.pred_plot_0.canvas.ax.plot(ego_hist_x, ego_hist_y, '-', color='red')
-        self.pred_plot_0.canvas.ax.scatter(ego_hist_x[-1], ego_hist_y[-1], color='red')
-        self.pred_plot_0.canvas.ax.plot(target_hist_x, target_hist_y, '-', color='blue')
-        self.pred_plot_0.canvas.ax.scatter(target_hist_x[-1], target_hist_y[-1], color='blue')
-
-        ego_aug = self.cur_data['ego_aug'][0]['traj'].numpy().copy()
-        ego_aug = np.concatenate([ego_aug, np.zeros_like(ego_aug[:, 0:1, :])], axis=1)
-        marker_size = 50
-        self.state_for_play = np.zeros(shape=(0, 2, 40, 2))
-
-        for i in range(ego_aug.shape[0]):
-            ego_aug[i, :, :] = np.concatenate([np.expand_dims(np.asarray([ego_hist_x[-1], ego_hist_y[-1]]), axis=0), ego_aug[i, :20, :]], axis=0)
-            ego_facecolors = 'none'
-            sur_facecolors = 'none'
-            if i == 0:
-                marker_shape = 's'
-            elif i == 1:
-                marker_shape = 'P'
-            elif i == 2:
-                marker_shape = '^'
-            elif i == 3:
-                marker_shape = '*'
-            elif i == 4:
-                marker_shape = 's'
-            elif i == 5:
-                marker_shape = 's'
-            elif i == 6:
-                marker_shape = 's'
-            if self.cand_toggles_1[i + 1].isChecked():
-                aug_x = ego_aug[i, :, 0]
-                aug_y = ego_aug[i, :, 1]
-                self.pred_plot_1.canvas.ax.plot(aug_x, aug_y, '--', color='red')
-                self.pred_plot_1.canvas.ax.scatter(aug_x[-1], aug_y[-1], marker_size, marker=marker_shape, facecolors=ego_facecolors, edgecolors='red')
-                self.pred_plot_0.canvas.ax.plot(aug_x, aug_y, '--', color='red')
-                self.pred_plot_0.canvas.ax.scatter(aug_x[-1], aug_y[-1], marker_size, marker=marker_shape, facecolors=ego_facecolors, edgecolors='red')
-                pred_reg = self.pred_out_1[i + 1]
-                self.pred_plot_1.canvas.ax.plot(pred_reg[:, 0].cpu(), pred_reg[:, 1].cpu(), '--', color='blue')
-                self.pred_plot_1.canvas.ax.scatter(pred_reg[-1, 0].cpu(), pred_reg[-1, 1].cpu(), marker_size, marker=marker_shape, facecolors=sur_facecolors, edgecolors='blue')
-                self.pred_plot_0.canvas.ax.plot(pred_reg[:, 0].cpu(), pred_reg[:, 1].cpu(), '--', color='blue')
-                self.pred_plot_0.canvas.ax.scatter(pred_reg[-1, 0].cpu(), pred_reg[-1, 1].cpu(), marker_size, marker=marker_shape, facecolors=sur_facecolors, edgecolors='blue')
-                ego_x_play = np.expand_dims(np.concatenate((ego_hist_x[:-1], aug_x)), axis=-1)
-                ego_y_play = np.expand_dims(np.concatenate((ego_hist_y[:-1], aug_y)), axis=-1)
-                ego_traj_play = np.expand_dims(np.concatenate((ego_x_play, ego_y_play), axis=-1), axis=0)
-                target_x_play = np.expand_dims(np.concatenate((target_hist_x, pred_reg[:, 0].cpu())), axis=-1)
-                target_y_play = np.expand_dims(np.concatenate((target_hist_y, pred_reg[:, 1].cpu())), axis=-1)
-                target_traj_play = np.expand_dims(np.concatenate((target_x_play, target_y_play), axis=-1), axis=0)
-                states = np.expand_dims(np.concatenate((ego_traj_play, target_traj_play), axis=0), axis=0)
-                self.state_for_play = np.concatenate((self.state_for_play, states), axis=0)
-            if self.cand_toggles_2[i + 1].isChecked():
-                aug_x = ego_aug[i, :, 0]
-                aug_y = ego_aug[i, :, 1]
-                self.pred_plot_2.canvas.ax.plot(aug_x, aug_y, '--', color='red')
-                self.pred_plot_2.canvas.ax.scatter(aug_x[-1], aug_y[-1], marker_size, marker=marker_shape, facecolors=ego_facecolors, edgecolors='red')
-                self.pred_plot_0.canvas.ax.plot(aug_x, aug_y, '--', color='red')
-                self.pred_plot_0.canvas.ax.scatter(aug_x[-1], aug_y[-1], marker_size, marker=marker_shape, facecolors=ego_facecolors, edgecolors='red')
-                pred_reg = self.pred_out_2[i + 1]
-                self.pred_plot_2.canvas.ax.plot(pred_reg[:, 0].cpu(), pred_reg[:, 1].cpu(), '--', color='blue')
-                self.pred_plot_2.canvas.ax.scatter(pred_reg[-1, 0].cpu(), pred_reg[-1, 1].cpu(), marker_size, marker=marker_shape, facecolors=sur_facecolors, edgecolors='blue')
-                self.pred_plot_0.canvas.ax.plot(pred_reg[:, 0].cpu(), pred_reg[:, 1].cpu(), '--', color='blue')
-                self.pred_plot_0.canvas.ax.scatter(pred_reg[-1, 0].cpu(), pred_reg[-1, 1].cpu(), marker_size, marker=marker_shape, facecolors=sur_facecolors, edgecolors='blue')
-                ego_x_play = np.expand_dims(np.concatenate((ego_hist_x[:-1], aug_x)), axis=-1)
-                ego_y_play = np.expand_dims(np.concatenate((ego_hist_y[:-1], aug_y)), axis=-1)
-                ego_traj_play = np.expand_dims(np.concatenate((ego_x_play, ego_y_play), axis=-1), axis=0)
-                target_x_play = np.expand_dims(np.concatenate((target_hist_x, pred_reg[:, 0].cpu())), axis=-1)
-                target_y_play = np.expand_dims(np.concatenate((target_hist_y, pred_reg[:, 1].cpu())), axis=-1)
-                target_traj_play = np.expand_dims(np.concatenate((target_x_play, target_y_play), axis=-1), axis=0)
-                states = np.expand_dims(np.concatenate((ego_traj_play, target_traj_play), axis=0), axis=0)
-                self.state_for_play = np.concatenate((self.state_for_play, states), axis=0)
-            if self.cand_toggles_3[i + 1].isChecked():
-                aug_x = ego_aug[i, :, 0]
-                aug_y = ego_aug[i, :, 1]
-                self.pred_plot_3.canvas.ax.plot(aug_x, aug_y, '--', color='red')
-                self.pred_plot_3.canvas.ax.scatter(aug_x[-1], aug_y[-1], marker_size, marker=marker_shape, facecolors=ego_facecolors, edgecolors='red')
-                self.pred_plot_0.canvas.ax.plot(aug_x, aug_y, '--', color='red')
-                self.pred_plot_0.canvas.ax.scatter(aug_x[-1], aug_y[-1], marker_size, marker=marker_shape, facecolors=ego_facecolors, edgecolors='red')
-                pred_reg = self.pred_out_3[i + 1]
-                self.pred_plot_3.canvas.ax.plot(pred_reg[:, 0].cpu(), pred_reg[:, 1].cpu(), '--', color='blue')
-                self.pred_plot_3.canvas.ax.scatter(pred_reg[-1, 0].cpu(), pred_reg[-1, 1].cpu(), marker_size, marker=marker_shape, facecolors=sur_facecolors, edgecolors='blue')
-                self.pred_plot_0.canvas.ax.plot(pred_reg[:, 0].cpu(), pred_reg[:, 1].cpu(), '--', color='blue')
-                self.pred_plot_0.canvas.ax.scatter(pred_reg[-1, 0].cpu(), pred_reg[-1, 1].cpu(), marker_size, marker=marker_shape, facecolors=sur_facecolors, edgecolors='blue')
-                ego_x_play = np.expand_dims(np.concatenate((ego_hist_x[:-1], aug_x)), axis=-1)
-                ego_y_play = np.expand_dims(np.concatenate((ego_hist_y[:-1], aug_y)), axis=-1)
-                ego_traj_play = np.expand_dims(np.concatenate((ego_x_play, ego_y_play), axis=-1), axis=0)
-                target_x_play = np.expand_dims(np.concatenate((target_hist_x, pred_reg[:, 0].cpu())), axis=-1)
-                target_y_play = np.expand_dims(np.concatenate((target_hist_y, pred_reg[:, 1].cpu())), axis=-1)
-                target_traj_play = np.expand_dims(np.concatenate((target_x_play, target_y_play), axis=-1), axis=0)
-                states = np.expand_dims(np.concatenate((ego_traj_play, target_traj_play), axis=0), axis=0)
-                self.state_for_play = np.concatenate((self.state_for_play, states), axis=0)
-            if self.cand_toggles_4[i + 1].isChecked():
-                aug_x = ego_aug[i, :, 0]
-                aug_y = ego_aug[i, :, 1]
-                self.pred_plot_4.canvas.ax.plot(aug_x, aug_y, '--', color='red')
-                self.pred_plot_4.canvas.ax.scatter(aug_x[-1], aug_y[-1], marker_size, marker=marker_shape, facecolors=ego_facecolors, edgecolors='red')
-                self.pred_plot_0.canvas.ax.plot(aug_x, aug_y, '--', color='red')
-                self.pred_plot_0.canvas.ax.scatter(aug_x[-1], aug_y[-1], marker_size, marker=marker_shape, facecolors=ego_facecolors, edgecolors='red')
-                pred_reg = self.pred_out_4[i + 1]
-                self.pred_plot_4.canvas.ax.plot(pred_reg[:, 0].cpu(), pred_reg[:, 1].cpu(), '--', color='blue')
-                self.pred_plot_4.canvas.ax.scatter(pred_reg[-1, 0].cpu(), pred_reg[-1, 1].cpu(), marker_size, marker=marker_shape, facecolors=sur_facecolors, edgecolors='blue')
-                self.pred_plot_0.canvas.ax.plot(pred_reg[:, 0].cpu(), pred_reg[:, 1].cpu(), '--', color='blue')
-                self.pred_plot_0.canvas.ax.scatter(pred_reg[-1, 0].cpu(), pred_reg[-1, 1].cpu(), marker_size, marker=marker_shape, facecolors=sur_facecolors, edgecolors='blue')
-                ego_x_play = np.expand_dims(np.concatenate((ego_hist_x[:-1], aug_x)), axis=-1)
-                ego_y_play = np.expand_dims(np.concatenate((ego_hist_y[:-1], aug_y)), axis=-1)
-                ego_traj_play = np.expand_dims(np.concatenate((ego_x_play, ego_y_play), axis=-1), axis=0)
-                target_x_play = np.expand_dims(np.concatenate((target_hist_x, pred_reg[:, 0].cpu())), axis=-1)
-                target_y_play = np.expand_dims(np.concatenate((target_hist_y, pred_reg[:, 1].cpu())), axis=-1)
-                target_traj_play = np.expand_dims(np.concatenate((target_x_play, target_y_play), axis=-1), axis=0)
-                states = np.expand_dims(np.concatenate((ego_traj_play, target_traj_play), axis=0), axis=0)
-                self.state_for_play = np.concatenate((self.state_for_play, states), axis=0)
-            if self.cand_toggles_5[i + 1].isChecked():
-                aug_x = ego_aug[i, :, 0]
-                aug_y = ego_aug[i, :, 1]
-                self.pred_plot_5.canvas.ax.plot(aug_x, aug_y, '--', color='red')
-                self.pred_plot_5.canvas.ax.scatter(aug_x[-1], aug_y[-1], marker_size, marker=marker_shape, facecolors=ego_facecolors, edgecolors='red')
-                self.pred_plot_0.canvas.ax.plot(aug_x, aug_y, '--', color='red')
-                self.pred_plot_0.canvas.ax.scatter(aug_x[-1], aug_y[-1], marker_size, marker=marker_shape, facecolors=ego_facecolors, edgecolors='red')
-                pred_reg = self.pred_out_5[i + 1]
-                self.pred_plot_5.canvas.ax.plot(pred_reg[:, 0].cpu(), pred_reg[:, 1].cpu(), '--', color='blue')
-                self.pred_plot_5.canvas.ax.scatter(pred_reg[-1, 0].cpu(), pred_reg[-1, 1].cpu(), marker_size, marker=marker_shape, facecolors=sur_facecolors, edgecolors='blue')
-                self.pred_plot_0.canvas.ax.plot(pred_reg[:, 0].cpu(), pred_reg[:, 1].cpu(), '--', color='blue')
-                self.pred_plot_0.canvas.ax.scatter(pred_reg[-1, 0].cpu(), pred_reg[-1, 1].cpu(), marker_size, marker=marker_shape, facecolors=sur_facecolors, edgecolors='blue')
-                ego_x_play = np.expand_dims(np.concatenate((ego_hist_x[:-1], aug_x)), axis=-1)
-                ego_y_play = np.expand_dims(np.concatenate((ego_hist_y[:-1], aug_y)), axis=-1)
-                ego_traj_play = np.expand_dims(np.concatenate((ego_x_play, ego_y_play), axis=-1), axis=0)
-                target_x_play = np.expand_dims(np.concatenate((target_hist_x, pred_reg[:, 0].cpu())), axis=-1)
-                target_y_play = np.expand_dims(np.concatenate((target_hist_y, pred_reg[:, 1].cpu())), axis=-1)
-                target_traj_play = np.expand_dims(np.concatenate((target_x_play, target_y_play), axis=-1), axis=0)
-                states = np.expand_dims(np.concatenate((ego_traj_play, target_traj_play), axis=0), axis=0)
-                self.state_for_play = np.concatenate((self.state_for_play, states), axis=0)
-
-        if self.ego_path_enable_1.isChecked():
-            self.pred_plot_1.canvas.ax.plot(ego_fut_x, ego_fut_y, '--', color='red')
-            self.pred_plot_1.canvas.ax.scatter(ego_fut_x[-1], ego_fut_y[-1], marker_size, marker="o", facecolors='red', edgecolors='red')
-            self.pred_plot_0.canvas.ax.plot(ego_fut_x, ego_fut_y, '--', color='red')
-            self.pred_plot_0.canvas.ax.scatter(ego_fut_x[-1], ego_fut_y[-1], marker_size, marker="o", facecolors='red', edgecolors='red')
-            pred_reg = self.pred_out_1[0]
-            self.pred_plot_1.canvas.ax.plot(pred_reg[:, 0].cpu(), pred_reg[:, 1].cpu(), '--', color='blue')
-            self.pred_plot_1.canvas.ax.scatter(pred_reg[-1, 0].cpu(), pred_reg[-1, 1].cpu(), marker_size, marker="o", facecolors='blue', edgecolors='blue')
-            self.pred_plot_0.canvas.ax.plot(pred_reg[:, 0].cpu(), pred_reg[:, 1].cpu(), '--', color='blue')
-            self.pred_plot_0.canvas.ax.scatter(pred_reg[-1, 0].cpu(), pred_reg[-1, 1].cpu(), marker_size, marker="o", facecolors='blue', edgecolors='blue')
-            ego_x_play = np.expand_dims(np.concatenate((ego_hist_x[:-1], ego_fut_x)), axis=-1)
-            ego_y_play = np.expand_dims(np.concatenate((ego_hist_y[:-1], ego_fut_y)), axis=-1)
-            ego_traj_play = np.expand_dims(np.concatenate((ego_x_play, ego_y_play), axis=-1), axis=0)
-            target_x_play = np.expand_dims(np.concatenate((target_hist_x, pred_reg[:, 0].cpu())), axis=-1)
-            target_y_play = np.expand_dims(np.concatenate((target_hist_y, pred_reg[:, 1].cpu())), axis=-1)
-            target_traj_play = np.expand_dims(np.concatenate((target_x_play, target_y_play), axis=-1), axis=0)
-            states = np.expand_dims(np.concatenate((ego_traj_play, target_traj_play), axis=0), axis=0)
-            self.state_for_play = np.concatenate((self.state_for_play, states), axis=0)
-        if self.ego_path_enable_2.isChecked():
-            self.pred_plot_2.canvas.ax.plot(ego_fut_x, ego_fut_y, '--', color='red')
-            self.pred_plot_2.canvas.ax.scatter(ego_fut_x[-1], ego_fut_y[-1], marker_size, marker="o", facecolors='red', edgecolors='red')
-            self.pred_plot_0.canvas.ax.plot(ego_fut_x, ego_fut_y, '--', color='red')
-            self.pred_plot_0.canvas.ax.scatter(ego_fut_x[-1], ego_fut_y[-1], marker_size, marker="o", facecolors='red', edgecolors='red')
-            pred_reg = self.pred_out_2[0]
-            self.pred_plot_2.canvas.ax.plot(pred_reg[:, 0].cpu(), pred_reg[:, 1].cpu(), '--', color='blue')
-            self.pred_plot_2.canvas.ax.scatter(pred_reg[-1, 0].cpu(), pred_reg[-1, 1].cpu(), marker_size, marker="o", facecolors='blue', edgecolors='blue')
-            self.pred_plot_0.canvas.ax.plot(pred_reg[:, 0].cpu(), pred_reg[:, 1].cpu(), '--', color='blue')
-            self.pred_plot_0.canvas.ax.scatter(pred_reg[-1, 0].cpu(), pred_reg[-1, 1].cpu(), marker_size, marker="o", facecolors='blue', edgecolors='blue')
-            ego_x_play = np.expand_dims(np.concatenate((ego_hist_x[:-1], ego_fut_x)), axis=-1)
-            ego_y_play = np.expand_dims(np.concatenate((ego_hist_y[:-1], ego_fut_y)), axis=-1)
-            ego_traj_play = np.expand_dims(np.concatenate((ego_x_play, ego_y_play), axis=-1), axis=0)
-            target_x_play = np.expand_dims(np.concatenate((target_hist_x, pred_reg[:, 0].cpu())), axis=-1)
-            target_y_play = np.expand_dims(np.concatenate((target_hist_y, pred_reg[:, 1].cpu())), axis=-1)
-            target_traj_play = np.expand_dims(np.concatenate((target_x_play, target_y_play), axis=-1), axis=0)
-            states = np.expand_dims(np.concatenate((ego_traj_play, target_traj_play), axis=0), axis=0)
-            self.state_for_play = np.concatenate((self.state_for_play, states), axis=0)
-        if self.ego_path_enable_3.isChecked():
-            self.pred_plot_3.canvas.ax.plot(ego_fut_x, ego_fut_y, '--', color='red')
-            self.pred_plot_3.canvas.ax.scatter(ego_fut_x[-1], ego_fut_y[-1], marker_size, marker="o", facecolors='red', edgecolors='red')
-            self.pred_plot_0.canvas.ax.plot(ego_fut_x, ego_fut_y, '--', color='red')
-            self.pred_plot_0.canvas.ax.scatter(ego_fut_x[-1], ego_fut_y[-1], marker_size, marker="o", facecolors='red', edgecolors='red')
-            pred_reg = self.pred_out_3[0]
-            self.pred_plot_3.canvas.ax.plot(pred_reg[:, 0].cpu(), pred_reg[:, 1].cpu(), '--', color='blue')
-            self.pred_plot_3.canvas.ax.scatter(pred_reg[-1, 0].cpu(), pred_reg[-1, 1].cpu(), marker_size, marker="o", facecolors='blue', edgecolors='blue')
-            self.pred_plot_0.canvas.ax.plot(pred_reg[:, 0].cpu(), pred_reg[:, 1].cpu(), '--', color='blue')
-            self.pred_plot_0.canvas.ax.scatter(pred_reg[-1, 0].cpu(), pred_reg[-1, 1].cpu(), marker_size, marker="o", facecolors='blue', edgecolors='blue')
-            ego_x_play = np.expand_dims(np.concatenate((ego_hist_x[:-1], ego_fut_x)), axis=-1)
-            ego_y_play = np.expand_dims(np.concatenate((ego_hist_y[:-1], ego_fut_y)), axis=-1)
-            ego_traj_play = np.expand_dims(np.concatenate((ego_x_play, ego_y_play), axis=-1), axis=0)
-            target_x_play = np.expand_dims(np.concatenate((target_hist_x, pred_reg[:, 0].cpu())), axis=-1)
-            target_y_play = np.expand_dims(np.concatenate((target_hist_y, pred_reg[:, 1].cpu())), axis=-1)
-            target_traj_play = np.expand_dims(np.concatenate((target_x_play, target_y_play), axis=-1), axis=0)
-            states = np.expand_dims(np.concatenate((ego_traj_play, target_traj_play), axis=0), axis=0)
-            self.state_for_play = np.concatenate((self.state_for_play, states), axis=0)
-        if self.ego_path_enable_4.isChecked():
-            self.pred_plot_4.canvas.ax.plot(ego_fut_x, ego_fut_y, '--', color='red')
-            self.pred_plot_4.canvas.ax.scatter(ego_fut_x[-1], ego_fut_y[-1], marker_size, marker="o", facecolors='red', edgecolors='red')
-            self.pred_plot_0.canvas.ax.plot(ego_fut_x, ego_fut_y, '--', color='red')
-            self.pred_plot_0.canvas.ax.scatter(ego_fut_x[-1], ego_fut_y[-1], marker_size, marker="o", facecolors='red', edgecolors='red')
-            pred_reg = self.pred_out_4[0]
-            self.pred_plot_4.canvas.ax.plot(pred_reg[:, 0].cpu(), pred_reg[:, 1].cpu(), '--', color='blue')
-            self.pred_plot_4.canvas.ax.scatter(pred_reg[-1, 0].cpu(), pred_reg[-1, 1].cpu(), marker_size, marker="o", facecolors='blue', edgecolors='blue')
-            self.pred_plot_0.canvas.ax.plot(pred_reg[:, 0].cpu(), pred_reg[:, 1].cpu(), '--', color='blue')
-            self.pred_plot_0.canvas.ax.scatter(pred_reg[-1, 0].cpu(), pred_reg[-1, 1].cpu(), marker_size, marker="o", facecolors='blue', edgecolors='blue')
-            ego_x_play = np.expand_dims(np.concatenate((ego_hist_x[:-1], ego_fut_x)), axis=-1)
-            ego_y_play = np.expand_dims(np.concatenate((ego_hist_y[:-1], ego_fut_y)), axis=-1)
-            ego_traj_play = np.expand_dims(np.concatenate((ego_x_play, ego_y_play), axis=-1), axis=0)
-            target_x_play = np.expand_dims(np.concatenate((target_hist_x, pred_reg[:, 0].cpu())), axis=-1)
-            target_y_play = np.expand_dims(np.concatenate((target_hist_y, pred_reg[:, 1].cpu())), axis=-1)
-            target_traj_play = np.expand_dims(np.concatenate((target_x_play, target_y_play), axis=-1), axis=0)
-            states = np.expand_dims(np.concatenate((ego_traj_play, target_traj_play), axis=0), axis=0)
-            self.state_for_play = np.concatenate((self.state_for_play, states), axis=0)
-        if self.ego_path_enable_5.isChecked():
-            self.pred_plot_5.canvas.ax.plot(ego_fut_x, ego_fut_y, '--', color='red')
-            self.pred_plot_5.canvas.ax.scatter(ego_fut_x[-1], ego_fut_y[-1], marker_size, marker="o", facecolors='red', edgecolors='red')
-            self.pred_plot_0.canvas.ax.plot(ego_fut_x, ego_fut_y, '--', color='red')
-            self.pred_plot_0.canvas.ax.scatter(ego_fut_x[-1], ego_fut_y[-1], marker_size, marker="o", facecolors='red', edgecolors='red')
-            pred_reg = self.pred_out_5[0]
-            self.pred_plot_5.canvas.ax.plot(pred_reg[:, 0].cpu(), pred_reg[:, 1].cpu(), '--', color='blue')
-            self.pred_plot_5.canvas.ax.scatter(pred_reg[-1, 0].cpu(), pred_reg[-1, 1].cpu(), marker_size, marker="o", facecolors='blue', edgecolors='blue')
-            self.pred_plot_0.canvas.ax.plot(pred_reg[:, 0].cpu(), pred_reg[:, 1].cpu(), '--', color='blue')
-            self.pred_plot_0.canvas.ax.scatter(pred_reg[-1, 0].cpu(), pred_reg[-1, 1].cpu(), marker_size, marker="o", facecolors='blue', edgecolors='blue')
-            ego_x_play = np.expand_dims(np.concatenate((ego_hist_x[:-1], ego_fut_x)), axis=-1)
-            ego_y_play = np.expand_dims(np.concatenate((ego_hist_y[:-1], ego_fut_y)), axis=-1)
-            ego_traj_play = np.expand_dims(np.concatenate((ego_x_play, ego_y_play), axis=-1), axis=0)
-            target_x_play = np.expand_dims(np.concatenate((target_hist_x, pred_reg[:, 0].cpu())), axis=-1)
-            target_y_play = np.expand_dims(np.concatenate((target_hist_y, pred_reg[:, 1].cpu())), axis=-1)
-            target_traj_play = np.expand_dims(np.concatenate((target_x_play, target_y_play), axis=-1), axis=0)
-            states = np.expand_dims(np.concatenate((ego_traj_play, target_traj_play), axis=0), axis=0)
-            self.state_for_play = np.concatenate((self.state_for_play, states), axis=0)
-
-        self.pred_plot_0.canvas.ax.plot(target_fut_x, target_fut_y, ':', color='black')
-        self.pred_plot_0.canvas.ax.scatter(target_fut_x[-1], target_fut_y[-1], color='black')
-        if self.show_predict_1.isChecked():
-            self.pred_plot_1.canvas.ax.plot(target_fut_x, target_fut_y, ':', color='black')
-            self.pred_plot_1.canvas.ax.scatter(target_fut_x[-1], target_fut_y[-1], color='black')
-        if self.show_predict_2.isChecked():
-            self.pred_plot_2.canvas.ax.plot(target_fut_x, target_fut_y, ':', color='black')
-            self.pred_plot_2.canvas.ax.scatter(target_fut_x[-1], target_fut_y[-1], color='black')
-        if self.show_predict_3.isChecked():
-            self.pred_plot_3.canvas.ax.plot(target_fut_x, target_fut_y, ':', color='black')
-            self.pred_plot_3.canvas.ax.scatter(target_fut_x[-1], target_fut_y[-1], color='black')
-        if self.show_predict_4.isChecked():
-            self.pred_plot_4.canvas.ax.plot(target_fut_x, target_fut_y, ':', color='black')
-            self.pred_plot_4.canvas.ax.scatter(target_fut_x[-1], target_fut_y[-1], color='black')
-        if self.show_predict_5.isChecked():
-            self.pred_plot_5.canvas.ax.plot(target_fut_x, target_fut_y, ':', color='black')
-            self.pred_plot_5.canvas.ax.scatter(target_fut_x[-1], target_fut_y[-1], color='black')
-
-        self.pred_plot_1.canvas.ax.set_xlim([xmin_1.item(), xmax_1.item()])
-        self.pred_plot_1.canvas.ax.set_ylim([ymin_1.item(), ymax_1.item()])
-        # self.pred_plot_1.canvas.ax.axis('equal')
-        self.pred_plot_1.canvas.draw()
-
-        self.pred_plot_2.canvas.ax.set_xlim([xmin_2.item(), xmax_2.item()])
-        self.pred_plot_2.canvas.ax.set_ylim([ymin_2.item(), ymax_2.item()])
-        # self.pred_plot_2.canvas.ax.axis('equal')
-        self.pred_plot_2.canvas.draw()
-
-        self.pred_plot_3.canvas.ax.set_xlim([xmin_3.item(), xmax_3.item()])
-        self.pred_plot_3.canvas.ax.set_ylim([ymin_3.item(), ymax_3.item()])
-        # self.pred_plot_3.canvas.ax.axis('equal')
-        self.pred_plot_3.canvas.draw()
-
-        self.pred_plot_4.canvas.ax.set_xlim([xmin_4.item(), xmax_4.item()])
-        self.pred_plot_4.canvas.ax.set_ylim([ymin_4.item(), ymax_4.item()])
-        # self.pred_plot_4.canvas.ax.axis('equal')
-        self.pred_plot_4.canvas.draw()
-
-        self.pred_plot_5.canvas.ax.set_xlim([xmin_5.item(), xmax_5.item()])
-        self.pred_plot_5.canvas.ax.set_ylim([ymin_5.item(), ymax_5.item()])
-        # self.pred_plot_5.canvas.ax.axis('equal')
-        self.pred_plot_5.canvas.draw()
-
-        self.pred_plot_0.canvas.ax.set_xlim([xmin_0.item(), xmax_0.item()])
-        self.pred_plot_0.canvas.ax.set_ylim([ymin_0.item(), ymax_0.item()])
-        # self.pred_plot_5.canvas.ax.axis('equal')
-        self.pred_plot_0.canvas.draw()
+        local_lane_polygons = am.find_local_lane_polygons([xmin, xmax, ymin, ymax], city_name)
+        draw_lane_polygons(self.pred_plot.canvas.ax, local_lane_polygons, color='darkgray')
+        self.pred_plot.canvas.ax.axis('equal')
+        self.pred_plot.canvas.ax.set_xlim([xmin.item(), xmax.item()])
+        self.pred_plot.canvas.ax.set_ylim([ymin.item(), ymax.item()])
+        self.pred_plot.canvas.draw()
+        # raw_data = []
+        # with open(self.data_dir + self.cur_data['file_name'][0], newline='') as csvfile:
+        #     spamreader = csv.reader(csvfile, delimiter=' ', quotechar='|')
+        #     for row in spamreader:
+        #         raw_data.append(row)
+        # raw_data = raw_data[1:]
+        # x = np.asarray([float(raw_data[i][0].split(',')[3]) for i in range(len(raw_data))])
+        # y = np.asarray([float(raw_data[i][0].split(',')[4]) for i in range(len(raw_data))])
+        # veh_class = [raw_data[i][0].split(',')[2] for i in range(len(raw_data))]
+        # time_stamp = [raw_data[i][0].split(',')[0] for i in range(len(raw_data))]
+        # ego_index = [i for i, x in enumerate(veh_class) if x == 'AV']
+        # ego_x = x[ego_index]
+        # ego_y = y[ego_index]
+        # ego_hist_x = ego_x[:20]
+        # ego_hist_y = ego_y[:20]
+        # ego_fut_x = ego_x[19:40]
+        # ego_fut_y = ego_y[19:40]
+        # target_index = [i for i, x in enumerate(veh_class) if x == 'AGENT']
+        # target_x = x[target_index]
+        # target_y = y[target_index]
+        # target_hist_x = target_x[:20]
+        # target_hist_y = target_y[:20]
+        # target_fut_x = target_x[19:40]
+        # target_fut_y = target_y[19:40]
+        # cur_time = raw_data[ego_index[19]][0].split(',')[0]
+        # cur_sur_index = [i for i, x in enumerate(time_stamp) if x == cur_time]
+        # sur_x = x[cur_sur_index]
+        # sur_y = y[cur_sur_index]
+        # self.pred_plot_1.canvas.ax.scatter(sur_x, sur_y, color='silver')
+        # self.pred_plot_2.canvas.ax.scatter(sur_x, sur_y, color='silver')
+        # self.pred_plot_3.canvas.ax.scatter(sur_x, sur_y, color='silver')
+        # self.pred_plot_4.canvas.ax.scatter(sur_x, sur_y, color='silver')
+        # self.pred_plot_5.canvas.ax.scatter(sur_x, sur_y, color='silver')
+        # self.pred_plot_0.canvas.ax.scatter(sur_x, sur_y, color='silver')
+        #
+        # self.pred_plot_1.canvas.ax.plot(ego_hist_x, ego_hist_y, '-', color='red')
+        # self.pred_plot_1.canvas.ax.scatter(ego_hist_x[-1], ego_hist_y[-1], color='red')
+        # self.pred_plot_1.canvas.ax.plot(target_hist_x, target_hist_y, '-', color='blue')
+        # self.pred_plot_1.canvas.ax.scatter(target_hist_x[-1], target_hist_y[-1], color='blue')
+        # self.pred_plot_2.canvas.ax.plot(ego_hist_x, ego_hist_y, '-', color='red')
+        # self.pred_plot_2.canvas.ax.scatter(ego_hist_x[-1], ego_hist_y[-1], color='red')
+        # self.pred_plot_2.canvas.ax.plot(target_hist_x, target_hist_y, '-', color='blue')
+        # self.pred_plot_2.canvas.ax.scatter(target_hist_x[-1], target_hist_y[-1], color='blue')
+        # self.pred_plot_3.canvas.ax.plot(ego_hist_x, ego_hist_y, '-', color='red')
+        # self.pred_plot_3.canvas.ax.scatter(ego_hist_x[-1], ego_hist_y[-1], color='red')
+        # self.pred_plot_3.canvas.ax.plot(target_hist_x, target_hist_y, '-', color='blue')
+        # self.pred_plot_3.canvas.ax.scatter(target_hist_x[-1], target_hist_y[-1], color='blue')
+        # self.pred_plot_4.canvas.ax.plot(ego_hist_x, ego_hist_y, '-', color='red')
+        # self.pred_plot_4.canvas.ax.scatter(ego_hist_x[-1], ego_hist_y[-1], color='red')
+        # self.pred_plot_4.canvas.ax.plot(target_hist_x, target_hist_y, '-', color='blue')
+        # self.pred_plot_4.canvas.ax.scatter(target_hist_x[-1], target_hist_y[-1], color='blue')
+        # self.pred_plot_5.canvas.ax.plot(ego_hist_x, ego_hist_y, '-', color='red')
+        # self.pred_plot_5.canvas.ax.scatter(ego_hist_x[-1], ego_hist_y[-1], color='red')
+        # self.pred_plot_5.canvas.ax.plot(target_hist_x, target_hist_y, '-', color='blue')
+        # self.pred_plot_5.canvas.ax.scatter(target_hist_x[-1], target_hist_y[-1], color='blue')
+        # self.pred_plot_0.canvas.ax.plot(ego_hist_x, ego_hist_y, '-', color='red')
+        # self.pred_plot_0.canvas.ax.scatter(ego_hist_x[-1], ego_hist_y[-1], color='red')
+        # self.pred_plot_0.canvas.ax.plot(target_hist_x, target_hist_y, '-', color='blue')
+        # self.pred_plot_0.canvas.ax.scatter(target_hist_x[-1], target_hist_y[-1], color='blue')
+        #
+        # ego_aug = self.cur_data['ego_aug'][0]['traj'].numpy().copy()
+        # ego_aug = np.concatenate([ego_aug, np.zeros_like(ego_aug[:, 0:1, :])], axis=1)
+        # marker_size = 50
+        # self.state_for_play = np.zeros(shape=(0, 2, 40, 2))
+        #
+        # for i in range(ego_aug.shape[0]):
+        #     ego_aug[i, :, :] = np.concatenate([np.expand_dims(np.asarray([ego_hist_x[-1], ego_hist_y[-1]]), axis=0), ego_aug[i, :20, :]], axis=0)
+        #     ego_facecolors = 'none'
+        #     sur_facecolors = 'none'
+        #     if i == 0:
+        #         marker_shape = 's'
+        #     elif i == 1:
+        #         marker_shape = 'P'
+        #     elif i == 2:
+        #         marker_shape = '^'
+        #     elif i == 3:
+        #         marker_shape = '*'
+        #     elif i == 4:
+        #         marker_shape = 's'
+        #     elif i == 5:
+        #         marker_shape = 's'
+        #     elif i == 6:
+        #         marker_shape = 's'
+        #     if self.cand_toggles_1[i + 1].isChecked():
+        #         aug_x = ego_aug[i, :, 0]
+        #         aug_y = ego_aug[i, :, 1]
+        #         self.pred_plot_1.canvas.ax.plot(aug_x, aug_y, '--', color='red')
+        #         self.pred_plot_1.canvas.ax.scatter(aug_x[-1], aug_y[-1], marker_size, marker=marker_shape, facecolors=ego_facecolors, edgecolors='red')
+        #         self.pred_plot_0.canvas.ax.plot(aug_x, aug_y, '--', color='red')
+        #         self.pred_plot_0.canvas.ax.scatter(aug_x[-1], aug_y[-1], marker_size, marker=marker_shape, facecolors=ego_facecolors, edgecolors='red')
+        #         pred_reg = self.pred_out_1[i + 1]
+        #         self.pred_plot_1.canvas.ax.plot(pred_reg[:, 0].cpu(), pred_reg[:, 1].cpu(), '--', color='blue')
+        #         self.pred_plot_1.canvas.ax.scatter(pred_reg[-1, 0].cpu(), pred_reg[-1, 1].cpu(), marker_size, marker=marker_shape, facecolors=sur_facecolors, edgecolors='blue')
+        #         self.pred_plot_0.canvas.ax.plot(pred_reg[:, 0].cpu(), pred_reg[:, 1].cpu(), '--', color='blue')
+        #         self.pred_plot_0.canvas.ax.scatter(pred_reg[-1, 0].cpu(), pred_reg[-1, 1].cpu(), marker_size, marker=marker_shape, facecolors=sur_facecolors, edgecolors='blue')
+        #         ego_x_play = np.expand_dims(np.concatenate((ego_hist_x[:-1], aug_x)), axis=-1)
+        #         ego_y_play = np.expand_dims(np.concatenate((ego_hist_y[:-1], aug_y)), axis=-1)
+        #         ego_traj_play = np.expand_dims(np.concatenate((ego_x_play, ego_y_play), axis=-1), axis=0)
+        #         target_x_play = np.expand_dims(np.concatenate((target_hist_x, pred_reg[:, 0].cpu())), axis=-1)
+        #         target_y_play = np.expand_dims(np.concatenate((target_hist_y, pred_reg[:, 1].cpu())), axis=-1)
+        #         target_traj_play = np.expand_dims(np.concatenate((target_x_play, target_y_play), axis=-1), axis=0)
+        #         states = np.expand_dims(np.concatenate((ego_traj_play, target_traj_play), axis=0), axis=0)
+        #         self.state_for_play = np.concatenate((self.state_for_play, states), axis=0)
+        #     if self.cand_toggles_2[i + 1].isChecked():
+        #         aug_x = ego_aug[i, :, 0]
+        #         aug_y = ego_aug[i, :, 1]
+        #         self.pred_plot_2.canvas.ax.plot(aug_x, aug_y, '--', color='red')
+        #         self.pred_plot_2.canvas.ax.scatter(aug_x[-1], aug_y[-1], marker_size, marker=marker_shape, facecolors=ego_facecolors, edgecolors='red')
+        #         self.pred_plot_0.canvas.ax.plot(aug_x, aug_y, '--', color='red')
+        #         self.pred_plot_0.canvas.ax.scatter(aug_x[-1], aug_y[-1], marker_size, marker=marker_shape, facecolors=ego_facecolors, edgecolors='red')
+        #         pred_reg = self.pred_out_2[i + 1]
+        #         self.pred_plot_2.canvas.ax.plot(pred_reg[:, 0].cpu(), pred_reg[:, 1].cpu(), '--', color='blue')
+        #         self.pred_plot_2.canvas.ax.scatter(pred_reg[-1, 0].cpu(), pred_reg[-1, 1].cpu(), marker_size, marker=marker_shape, facecolors=sur_facecolors, edgecolors='blue')
+        #         self.pred_plot_0.canvas.ax.plot(pred_reg[:, 0].cpu(), pred_reg[:, 1].cpu(), '--', color='blue')
+        #         self.pred_plot_0.canvas.ax.scatter(pred_reg[-1, 0].cpu(), pred_reg[-1, 1].cpu(), marker_size, marker=marker_shape, facecolors=sur_facecolors, edgecolors='blue')
+        #         ego_x_play = np.expand_dims(np.concatenate((ego_hist_x[:-1], aug_x)), axis=-1)
+        #         ego_y_play = np.expand_dims(np.concatenate((ego_hist_y[:-1], aug_y)), axis=-1)
+        #         ego_traj_play = np.expand_dims(np.concatenate((ego_x_play, ego_y_play), axis=-1), axis=0)
+        #         target_x_play = np.expand_dims(np.concatenate((target_hist_x, pred_reg[:, 0].cpu())), axis=-1)
+        #         target_y_play = np.expand_dims(np.concatenate((target_hist_y, pred_reg[:, 1].cpu())), axis=-1)
+        #         target_traj_play = np.expand_dims(np.concatenate((target_x_play, target_y_play), axis=-1), axis=0)
+        #         states = np.expand_dims(np.concatenate((ego_traj_play, target_traj_play), axis=0), axis=0)
+        #         self.state_for_play = np.concatenate((self.state_for_play, states), axis=0)
+        #     if self.cand_toggles_3[i + 1].isChecked():
+        #         aug_x = ego_aug[i, :, 0]
+        #         aug_y = ego_aug[i, :, 1]
+        #         self.pred_plot_3.canvas.ax.plot(aug_x, aug_y, '--', color='red')
+        #         self.pred_plot_3.canvas.ax.scatter(aug_x[-1], aug_y[-1], marker_size, marker=marker_shape, facecolors=ego_facecolors, edgecolors='red')
+        #         self.pred_plot_0.canvas.ax.plot(aug_x, aug_y, '--', color='red')
+        #         self.pred_plot_0.canvas.ax.scatter(aug_x[-1], aug_y[-1], marker_size, marker=marker_shape, facecolors=ego_facecolors, edgecolors='red')
+        #         pred_reg = self.pred_out_3[i + 1]
+        #         self.pred_plot_3.canvas.ax.plot(pred_reg[:, 0].cpu(), pred_reg[:, 1].cpu(), '--', color='blue')
+        #         self.pred_plot_3.canvas.ax.scatter(pred_reg[-1, 0].cpu(), pred_reg[-1, 1].cpu(), marker_size, marker=marker_shape, facecolors=sur_facecolors, edgecolors='blue')
+        #         self.pred_plot_0.canvas.ax.plot(pred_reg[:, 0].cpu(), pred_reg[:, 1].cpu(), '--', color='blue')
+        #         self.pred_plot_0.canvas.ax.scatter(pred_reg[-1, 0].cpu(), pred_reg[-1, 1].cpu(), marker_size, marker=marker_shape, facecolors=sur_facecolors, edgecolors='blue')
+        #         ego_x_play = np.expand_dims(np.concatenate((ego_hist_x[:-1], aug_x)), axis=-1)
+        #         ego_y_play = np.expand_dims(np.concatenate((ego_hist_y[:-1], aug_y)), axis=-1)
+        #         ego_traj_play = np.expand_dims(np.concatenate((ego_x_play, ego_y_play), axis=-1), axis=0)
+        #         target_x_play = np.expand_dims(np.concatenate((target_hist_x, pred_reg[:, 0].cpu())), axis=-1)
+        #         target_y_play = np.expand_dims(np.concatenate((target_hist_y, pred_reg[:, 1].cpu())), axis=-1)
+        #         target_traj_play = np.expand_dims(np.concatenate((target_x_play, target_y_play), axis=-1), axis=0)
+        #         states = np.expand_dims(np.concatenate((ego_traj_play, target_traj_play), axis=0), axis=0)
+        #         self.state_for_play = np.concatenate((self.state_for_play, states), axis=0)
+        #     if self.cand_toggles_4[i + 1].isChecked():
+        #         aug_x = ego_aug[i, :, 0]
+        #         aug_y = ego_aug[i, :, 1]
+        #         self.pred_plot_4.canvas.ax.plot(aug_x, aug_y, '--', color='red')
+        #         self.pred_plot_4.canvas.ax.scatter(aug_x[-1], aug_y[-1], marker_size, marker=marker_shape, facecolors=ego_facecolors, edgecolors='red')
+        #         self.pred_plot_0.canvas.ax.plot(aug_x, aug_y, '--', color='red')
+        #         self.pred_plot_0.canvas.ax.scatter(aug_x[-1], aug_y[-1], marker_size, marker=marker_shape, facecolors=ego_facecolors, edgecolors='red')
+        #         pred_reg = self.pred_out_4[i + 1]
+        #         self.pred_plot_4.canvas.ax.plot(pred_reg[:, 0].cpu(), pred_reg[:, 1].cpu(), '--', color='blue')
+        #         self.pred_plot_4.canvas.ax.scatter(pred_reg[-1, 0].cpu(), pred_reg[-1, 1].cpu(), marker_size, marker=marker_shape, facecolors=sur_facecolors, edgecolors='blue')
+        #         self.pred_plot_0.canvas.ax.plot(pred_reg[:, 0].cpu(), pred_reg[:, 1].cpu(), '--', color='blue')
+        #         self.pred_plot_0.canvas.ax.scatter(pred_reg[-1, 0].cpu(), pred_reg[-1, 1].cpu(), marker_size, marker=marker_shape, facecolors=sur_facecolors, edgecolors='blue')
+        #         ego_x_play = np.expand_dims(np.concatenate((ego_hist_x[:-1], aug_x)), axis=-1)
+        #         ego_y_play = np.expand_dims(np.concatenate((ego_hist_y[:-1], aug_y)), axis=-1)
+        #         ego_traj_play = np.expand_dims(np.concatenate((ego_x_play, ego_y_play), axis=-1), axis=0)
+        #         target_x_play = np.expand_dims(np.concatenate((target_hist_x, pred_reg[:, 0].cpu())), axis=-1)
+        #         target_y_play = np.expand_dims(np.concatenate((target_hist_y, pred_reg[:, 1].cpu())), axis=-1)
+        #         target_traj_play = np.expand_dims(np.concatenate((target_x_play, target_y_play), axis=-1), axis=0)
+        #         states = np.expand_dims(np.concatenate((ego_traj_play, target_traj_play), axis=0), axis=0)
+        #         self.state_for_play = np.concatenate((self.state_for_play, states), axis=0)
+        #     if self.cand_toggles_5[i + 1].isChecked():
+        #         aug_x = ego_aug[i, :, 0]
+        #         aug_y = ego_aug[i, :, 1]
+        #         self.pred_plot_5.canvas.ax.plot(aug_x, aug_y, '--', color='red')
+        #         self.pred_plot_5.canvas.ax.scatter(aug_x[-1], aug_y[-1], marker_size, marker=marker_shape, facecolors=ego_facecolors, edgecolors='red')
+        #         self.pred_plot_0.canvas.ax.plot(aug_x, aug_y, '--', color='red')
+        #         self.pred_plot_0.canvas.ax.scatter(aug_x[-1], aug_y[-1], marker_size, marker=marker_shape, facecolors=ego_facecolors, edgecolors='red')
+        #         pred_reg = self.pred_out_5[i + 1]
+        #         self.pred_plot_5.canvas.ax.plot(pred_reg[:, 0].cpu(), pred_reg[:, 1].cpu(), '--', color='blue')
+        #         self.pred_plot_5.canvas.ax.scatter(pred_reg[-1, 0].cpu(), pred_reg[-1, 1].cpu(), marker_size, marker=marker_shape, facecolors=sur_facecolors, edgecolors='blue')
+        #         self.pred_plot_0.canvas.ax.plot(pred_reg[:, 0].cpu(), pred_reg[:, 1].cpu(), '--', color='blue')
+        #         self.pred_plot_0.canvas.ax.scatter(pred_reg[-1, 0].cpu(), pred_reg[-1, 1].cpu(), marker_size, marker=marker_shape, facecolors=sur_facecolors, edgecolors='blue')
+        #         ego_x_play = np.expand_dims(np.concatenate((ego_hist_x[:-1], aug_x)), axis=-1)
+        #         ego_y_play = np.expand_dims(np.concatenate((ego_hist_y[:-1], aug_y)), axis=-1)
+        #         ego_traj_play = np.expand_dims(np.concatenate((ego_x_play, ego_y_play), axis=-1), axis=0)
+        #         target_x_play = np.expand_dims(np.concatenate((target_hist_x, pred_reg[:, 0].cpu())), axis=-1)
+        #         target_y_play = np.expand_dims(np.concatenate((target_hist_y, pred_reg[:, 1].cpu())), axis=-1)
+        #         target_traj_play = np.expand_dims(np.concatenate((target_x_play, target_y_play), axis=-1), axis=0)
+        #         states = np.expand_dims(np.concatenate((ego_traj_play, target_traj_play), axis=0), axis=0)
+        #         self.state_for_play = np.concatenate((self.state_for_play, states), axis=0)
+        #
+        # if self.ego_path_enable_1.isChecked():
+        #     self.pred_plot_1.canvas.ax.plot(ego_fut_x, ego_fut_y, '--', color='red')
+        #     self.pred_plot_1.canvas.ax.scatter(ego_fut_x[-1], ego_fut_y[-1], marker_size, marker="o", facecolors='red', edgecolors='red')
+        #     self.pred_plot_0.canvas.ax.plot(ego_fut_x, ego_fut_y, '--', color='red')
+        #     self.pred_plot_0.canvas.ax.scatter(ego_fut_x[-1], ego_fut_y[-1], marker_size, marker="o", facecolors='red', edgecolors='red')
+        #     pred_reg = self.pred_out_1[0]
+        #     self.pred_plot_1.canvas.ax.plot(pred_reg[:, 0].cpu(), pred_reg[:, 1].cpu(), '--', color='blue')
+        #     self.pred_plot_1.canvas.ax.scatter(pred_reg[-1, 0].cpu(), pred_reg[-1, 1].cpu(), marker_size, marker="o", facecolors='blue', edgecolors='blue')
+        #     self.pred_plot_0.canvas.ax.plot(pred_reg[:, 0].cpu(), pred_reg[:, 1].cpu(), '--', color='blue')
+        #     self.pred_plot_0.canvas.ax.scatter(pred_reg[-1, 0].cpu(), pred_reg[-1, 1].cpu(), marker_size, marker="o", facecolors='blue', edgecolors='blue')
+        #     ego_x_play = np.expand_dims(np.concatenate((ego_hist_x[:-1], ego_fut_x)), axis=-1)
+        #     ego_y_play = np.expand_dims(np.concatenate((ego_hist_y[:-1], ego_fut_y)), axis=-1)
+        #     ego_traj_play = np.expand_dims(np.concatenate((ego_x_play, ego_y_play), axis=-1), axis=0)
+        #     target_x_play = np.expand_dims(np.concatenate((target_hist_x, pred_reg[:, 0].cpu())), axis=-1)
+        #     target_y_play = np.expand_dims(np.concatenate((target_hist_y, pred_reg[:, 1].cpu())), axis=-1)
+        #     target_traj_play = np.expand_dims(np.concatenate((target_x_play, target_y_play), axis=-1), axis=0)
+        #     states = np.expand_dims(np.concatenate((ego_traj_play, target_traj_play), axis=0), axis=0)
+        #     self.state_for_play = np.concatenate((self.state_for_play, states), axis=0)
+        # if self.ego_path_enable_2.isChecked():
+        #     self.pred_plot_2.canvas.ax.plot(ego_fut_x, ego_fut_y, '--', color='red')
+        #     self.pred_plot_2.canvas.ax.scatter(ego_fut_x[-1], ego_fut_y[-1], marker_size, marker="o", facecolors='red', edgecolors='red')
+        #     self.pred_plot_0.canvas.ax.plot(ego_fut_x, ego_fut_y, '--', color='red')
+        #     self.pred_plot_0.canvas.ax.scatter(ego_fut_x[-1], ego_fut_y[-1], marker_size, marker="o", facecolors='red', edgecolors='red')
+        #     pred_reg = self.pred_out_2[0]
+        #     self.pred_plot_2.canvas.ax.plot(pred_reg[:, 0].cpu(), pred_reg[:, 1].cpu(), '--', color='blue')
+        #     self.pred_plot_2.canvas.ax.scatter(pred_reg[-1, 0].cpu(), pred_reg[-1, 1].cpu(), marker_size, marker="o", facecolors='blue', edgecolors='blue')
+        #     self.pred_plot_0.canvas.ax.plot(pred_reg[:, 0].cpu(), pred_reg[:, 1].cpu(), '--', color='blue')
+        #     self.pred_plot_0.canvas.ax.scatter(pred_reg[-1, 0].cpu(), pred_reg[-1, 1].cpu(), marker_size, marker="o", facecolors='blue', edgecolors='blue')
+        #     ego_x_play = np.expand_dims(np.concatenate((ego_hist_x[:-1], ego_fut_x)), axis=-1)
+        #     ego_y_play = np.expand_dims(np.concatenate((ego_hist_y[:-1], ego_fut_y)), axis=-1)
+        #     ego_traj_play = np.expand_dims(np.concatenate((ego_x_play, ego_y_play), axis=-1), axis=0)
+        #     target_x_play = np.expand_dims(np.concatenate((target_hist_x, pred_reg[:, 0].cpu())), axis=-1)
+        #     target_y_play = np.expand_dims(np.concatenate((target_hist_y, pred_reg[:, 1].cpu())), axis=-1)
+        #     target_traj_play = np.expand_dims(np.concatenate((target_x_play, target_y_play), axis=-1), axis=0)
+        #     states = np.expand_dims(np.concatenate((ego_traj_play, target_traj_play), axis=0), axis=0)
+        #     self.state_for_play = np.concatenate((self.state_for_play, states), axis=0)
+        # if self.ego_path_enable_3.isChecked():
+        #     self.pred_plot_3.canvas.ax.plot(ego_fut_x, ego_fut_y, '--', color='red')
+        #     self.pred_plot_3.canvas.ax.scatter(ego_fut_x[-1], ego_fut_y[-1], marker_size, marker="o", facecolors='red', edgecolors='red')
+        #     self.pred_plot_0.canvas.ax.plot(ego_fut_x, ego_fut_y, '--', color='red')
+        #     self.pred_plot_0.canvas.ax.scatter(ego_fut_x[-1], ego_fut_y[-1], marker_size, marker="o", facecolors='red', edgecolors='red')
+        #     pred_reg = self.pred_out_3[0]
+        #     self.pred_plot_3.canvas.ax.plot(pred_reg[:, 0].cpu(), pred_reg[:, 1].cpu(), '--', color='blue')
+        #     self.pred_plot_3.canvas.ax.scatter(pred_reg[-1, 0].cpu(), pred_reg[-1, 1].cpu(), marker_size, marker="o", facecolors='blue', edgecolors='blue')
+        #     self.pred_plot_0.canvas.ax.plot(pred_reg[:, 0].cpu(), pred_reg[:, 1].cpu(), '--', color='blue')
+        #     self.pred_plot_0.canvas.ax.scatter(pred_reg[-1, 0].cpu(), pred_reg[-1, 1].cpu(), marker_size, marker="o", facecolors='blue', edgecolors='blue')
+        #     ego_x_play = np.expand_dims(np.concatenate((ego_hist_x[:-1], ego_fut_x)), axis=-1)
+        #     ego_y_play = np.expand_dims(np.concatenate((ego_hist_y[:-1], ego_fut_y)), axis=-1)
+        #     ego_traj_play = np.expand_dims(np.concatenate((ego_x_play, ego_y_play), axis=-1), axis=0)
+        #     target_x_play = np.expand_dims(np.concatenate((target_hist_x, pred_reg[:, 0].cpu())), axis=-1)
+        #     target_y_play = np.expand_dims(np.concatenate((target_hist_y, pred_reg[:, 1].cpu())), axis=-1)
+        #     target_traj_play = np.expand_dims(np.concatenate((target_x_play, target_y_play), axis=-1), axis=0)
+        #     states = np.expand_dims(np.concatenate((ego_traj_play, target_traj_play), axis=0), axis=0)
+        #     self.state_for_play = np.concatenate((self.state_for_play, states), axis=0)
+        # if self.ego_path_enable_4.isChecked():
+        #     self.pred_plot_4.canvas.ax.plot(ego_fut_x, ego_fut_y, '--', color='red')
+        #     self.pred_plot_4.canvas.ax.scatter(ego_fut_x[-1], ego_fut_y[-1], marker_size, marker="o", facecolors='red', edgecolors='red')
+        #     self.pred_plot_0.canvas.ax.plot(ego_fut_x, ego_fut_y, '--', color='red')
+        #     self.pred_plot_0.canvas.ax.scatter(ego_fut_x[-1], ego_fut_y[-1], marker_size, marker="o", facecolors='red', edgecolors='red')
+        #     pred_reg = self.pred_out_4[0]
+        #     self.pred_plot_4.canvas.ax.plot(pred_reg[:, 0].cpu(), pred_reg[:, 1].cpu(), '--', color='blue')
+        #     self.pred_plot_4.canvas.ax.scatter(pred_reg[-1, 0].cpu(), pred_reg[-1, 1].cpu(), marker_size, marker="o", facecolors='blue', edgecolors='blue')
+        #     self.pred_plot_0.canvas.ax.plot(pred_reg[:, 0].cpu(), pred_reg[:, 1].cpu(), '--', color='blue')
+        #     self.pred_plot_0.canvas.ax.scatter(pred_reg[-1, 0].cpu(), pred_reg[-1, 1].cpu(), marker_size, marker="o", facecolors='blue', edgecolors='blue')
+        #     ego_x_play = np.expand_dims(np.concatenate((ego_hist_x[:-1], ego_fut_x)), axis=-1)
+        #     ego_y_play = np.expand_dims(np.concatenate((ego_hist_y[:-1], ego_fut_y)), axis=-1)
+        #     ego_traj_play = np.expand_dims(np.concatenate((ego_x_play, ego_y_play), axis=-1), axis=0)
+        #     target_x_play = np.expand_dims(np.concatenate((target_hist_x, pred_reg[:, 0].cpu())), axis=-1)
+        #     target_y_play = np.expand_dims(np.concatenate((target_hist_y, pred_reg[:, 1].cpu())), axis=-1)
+        #     target_traj_play = np.expand_dims(np.concatenate((target_x_play, target_y_play), axis=-1), axis=0)
+        #     states = np.expand_dims(np.concatenate((ego_traj_play, target_traj_play), axis=0), axis=0)
+        #     self.state_for_play = np.concatenate((self.state_for_play, states), axis=0)
+        # if self.ego_path_enable_5.isChecked():
+        #     self.pred_plot_5.canvas.ax.plot(ego_fut_x, ego_fut_y, '--', color='red')
+        #     self.pred_plot_5.canvas.ax.scatter(ego_fut_x[-1], ego_fut_y[-1], marker_size, marker="o", facecolors='red', edgecolors='red')
+        #     self.pred_plot_0.canvas.ax.plot(ego_fut_x, ego_fut_y, '--', color='red')
+        #     self.pred_plot_0.canvas.ax.scatter(ego_fut_x[-1], ego_fut_y[-1], marker_size, marker="o", facecolors='red', edgecolors='red')
+        #     pred_reg = self.pred_out_5[0]
+        #     self.pred_plot_5.canvas.ax.plot(pred_reg[:, 0].cpu(), pred_reg[:, 1].cpu(), '--', color='blue')
+        #     self.pred_plot_5.canvas.ax.scatter(pred_reg[-1, 0].cpu(), pred_reg[-1, 1].cpu(), marker_size, marker="o", facecolors='blue', edgecolors='blue')
+        #     self.pred_plot_0.canvas.ax.plot(pred_reg[:, 0].cpu(), pred_reg[:, 1].cpu(), '--', color='blue')
+        #     self.pred_plot_0.canvas.ax.scatter(pred_reg[-1, 0].cpu(), pred_reg[-1, 1].cpu(), marker_size, marker="o", facecolors='blue', edgecolors='blue')
+        #     ego_x_play = np.expand_dims(np.concatenate((ego_hist_x[:-1], ego_fut_x)), axis=-1)
+        #     ego_y_play = np.expand_dims(np.concatenate((ego_hist_y[:-1], ego_fut_y)), axis=-1)
+        #     ego_traj_play = np.expand_dims(np.concatenate((ego_x_play, ego_y_play), axis=-1), axis=0)
+        #     target_x_play = np.expand_dims(np.concatenate((target_hist_x, pred_reg[:, 0].cpu())), axis=-1)
+        #     target_y_play = np.expand_dims(np.concatenate((target_hist_y, pred_reg[:, 1].cpu())), axis=-1)
+        #     target_traj_play = np.expand_dims(np.concatenate((target_x_play, target_y_play), axis=-1), axis=0)
+        #     states = np.expand_dims(np.concatenate((ego_traj_play, target_traj_play), axis=0), axis=0)
+        #     self.state_for_play = np.concatenate((self.state_for_play, states), axis=0)
+        #
+        # self.pred_plot_0.canvas.ax.plot(target_fut_x, target_fut_y, ':', color='black')
+        # self.pred_plot_0.canvas.ax.scatter(target_fut_x[-1], target_fut_y[-1], color='black')
+        # if self.show_predict_1.isChecked():
+        #     self.pred_plot_1.canvas.ax.plot(target_fut_x, target_fut_y, ':', color='black')
+        #     self.pred_plot_1.canvas.ax.scatter(target_fut_x[-1], target_fut_y[-1], color='black')
+        # if self.show_predict_2.isChecked():
+        #     self.pred_plot_2.canvas.ax.plot(target_fut_x, target_fut_y, ':', color='black')
+        #     self.pred_plot_2.canvas.ax.scatter(target_fut_x[-1], target_fut_y[-1], color='black')
+        # if self.show_predict_3.isChecked():
+        #     self.pred_plot_3.canvas.ax.plot(target_fut_x, target_fut_y, ':', color='black')
+        #     self.pred_plot_3.canvas.ax.scatter(target_fut_x[-1], target_fut_y[-1], color='black')
+        # if self.show_predict_4.isChecked():
+        #     self.pred_plot_4.canvas.ax.plot(target_fut_x, target_fut_y, ':', color='black')
+        #     self.pred_plot_4.canvas.ax.scatter(target_fut_x[-1], target_fut_y[-1], color='black')
+        # if self.show_predict_5.isChecked():
+        #     self.pred_plot_5.canvas.ax.plot(target_fut_x, target_fut_y, ':', color='black')
+        #     self.pred_plot_5.canvas.ax.scatter(target_fut_x[-1], target_fut_y[-1], color='black')
+        #
+        # self.pred_plot_1.canvas.ax.set_xlim([xmin_1.item(), xmax_1.item()])
+        # self.pred_plot_1.canvas.ax.set_ylim([ymin_1.item(), ymax_1.item()])
+        # # self.pred_plot_1.canvas.ax.axis('equal')
+        # self.pred_plot_1.canvas.draw()
+        #
+        # self.pred_plot_2.canvas.ax.set_xlim([xmin_2.item(), xmax_2.item()])
+        # self.pred_plot_2.canvas.ax.set_ylim([ymin_2.item(), ymax_2.item()])
+        # # self.pred_plot_2.canvas.ax.axis('equal')
+        # self.pred_plot_2.canvas.draw()
+        #
+        # self.pred_plot_3.canvas.ax.set_xlim([xmin_3.item(), xmax_3.item()])
+        # self.pred_plot_3.canvas.ax.set_ylim([ymin_3.item(), ymax_3.item()])
+        # # self.pred_plot_3.canvas.ax.axis('equal')
+        # self.pred_plot_3.canvas.draw()
+        #
+        # self.pred_plot_4.canvas.ax.set_xlim([xmin_4.item(), xmax_4.item()])
+        # self.pred_plot_4.canvas.ax.set_ylim([ymin_4.item(), ymax_4.item()])
+        # # self.pred_plot_4.canvas.ax.axis('equal')
+        # self.pred_plot_4.canvas.draw()
+        #
+        # self.pred_plot_5.canvas.ax.set_xlim([xmin_5.item(), xmax_5.item()])
+        # self.pred_plot_5.canvas.ax.set_ylim([ymin_5.item(), ymax_5.item()])
+        # # self.pred_plot_5.canvas.ax.axis('equal')
+        # self.pred_plot_5.canvas.draw()
+        #
+        # self.pred_plot_0.canvas.ax.set_xlim([xmin_0.item(), xmax_0.item()])
+        # self.pred_plot_0.canvas.ax.set_ylim([ymin_0.item(), ymax_0.item()])
+        # # self.pred_plot_5.canvas.ax.axis('equal')
+        # self.pred_plot_0.canvas.draw()
 
     def scenario_play(self):
         data = self.state_for_play
