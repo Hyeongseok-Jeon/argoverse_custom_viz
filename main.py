@@ -3,6 +3,7 @@
 # TODO loss comparison : 1825  23362 30458 26678 33518(downstream & no representation), 29425 (no reconstruction & no recon no repre), 23405(no reconstruction & downstream)
 # TODO loss comparison : 36445 (ds, no recon no repre)
 # 2449 15339(no recon loss) 18861 35883 29870 31513 10737 36694 25770 22563 12220
+
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
@@ -71,16 +72,18 @@ class MainDialog(QMainWindow, ui_files.gui.Ui_Dialog):
     def data_load(self):
         root = tkinter.Tk()
         root.withdraw()
-        data_file = tkinter.filedialog.askopenfilename(parent=root, initialdir=os.path.join(self.root_dir))
+        self.data_file = tkinter.filedialog.askopenfilename(parent=root, initialdir=os.path.join(self.root_dir))
 
-        self.data = np.load(data_file)
-        self.row_index = np.where(self.data[:, 0, 0, -1] == 1)[0][0]
-        self.dataInfo.setText(data_file + ' is loaded successfully')
+        self.data = np.load(self.data_file)
+        self.find_original_index()
+        self.row_index = np.where(self.data[:, 0, 0, -1] == np.min(self.data[:, 0, 0, -1]))[0][0]
+        self.dataInfo.setText(self.data_file + ' is loaded successfully')
         self.data_num.setText(str(self.data.shape[0]))
         self.data_update(self.row_index)
 
     def data_update(self, row_index):
-        self.data_index = self.find_original_index(row_index)
+        self.find_original_index_inference(row_index)
+        self.data_index = int(self.data[row_index,0,0,-1])
         self.cur_data = self.afl.get(self.original_data_dir + '/' + str(self.data_index) + '.csv')
         self.idx_data.setText(str(row_index))
         self.data_dir_data.setText(str(self.cur_data.current_seq))
@@ -100,7 +103,7 @@ class MainDialog(QMainWindow, ui_files.gui.Ui_Dialog):
         self.city = self.cur_data.seq_df.CITY_NAME[0]
         self.visualization()
 
-    def find_original_index(self, row_index):
+    def find_original_index_inference(self, row_index):
         disp = self.target_traj_converted[:, 20:, :] - self.data[row_index, 1, :, :2]
         disp_list = []
         for j in range(len(self.afl)):
@@ -108,7 +111,24 @@ class MainDialog(QMainWindow, ui_files.gui.Ui_Dialog):
         I = disp_list.index(min(disp_list))
         disp_list.sort()
         print(disp_list[:3])
-        return int(self.data_idx_map[I])
+
+    def find_original_index(self):
+        if self.data.shape[-1] < 3:
+            print('prediction results are in progress')
+            bar = progressbar.ProgressBar(maxval=100, \
+                                          widgets=[progressbar.Bar('=', '[', ']'), ' ', progressbar.Percentage()])
+            bar.start()
+            self.data = np.concatenate([self.data, np.zeros_like(self.data[:, :, :, :1])], axis=-1)
+            for i in range(len(self.data)):
+                bar.update(int(100 * i / len(self.data)))
+                disp = self.target_traj_converted[:, 20:, :] - self.data[i, 1, :, :2]
+                disp_list = []
+                for j in range(len(self.afl)):
+                    disp_list.append(np.sum(np.linalg.norm(disp[j], axis=1)))
+                I = disp_list.index(min(disp_list))
+                self.data[i, :, :, -1] = I
+            bar.finish()
+            np.save(self.data_file,self.data)
 
     def fov_update(self):
         self.fov = int(self.fov_data.text())
@@ -117,12 +137,8 @@ class MainDialog(QMainWindow, ui_files.gui.Ui_Dialog):
         self.visualization()
 
     def idx_update(self):
-        if len(np.where(self.data[:,0,0,-1] == float(self.idx_data.text()))[0]) == 0:
-            self.idx_data.setText('no data')
-            self.data_dir_data.setText('no data')
-        else:
-            self.row_index = np.where(self.data[:,0,0,-1] == float(self.idx_data.text()))[0][0]
-            self.data_update(self.row_index)
+        self.row_index = int(self.idx_data.text())
+        self.data_update(self.row_index)
 
     def index_update(self):
         target_index = float(self.data_dir_data.text())
@@ -135,22 +151,23 @@ class MainDialog(QMainWindow, ui_files.gui.Ui_Dialog):
             self.data_dir_data.setText('no data')
 
     def next(self):
+        cur_idx = self.data_index
         while True:
-            cur_idx = self.data_index
             cur_idx = cur_idx + 1
             row_index_cand = np.where(self.data[:, 0, 0, -1] == cur_idx)[0]
             self.idx_data.setText(str(row_index_cand))
             if len(row_index_cand) > 0:
                 try:
-                    self.row_index = np.where(self.data[:, 0, 0, -1] == cur_idx)[0][0]
+                    # self.row_index = np.where(self.data[:, 0, 0, -1] == cur_idx)[0][0]
+                    self.row_index = row_index_cand[0]
                     self.data_update(self.row_index)
                     break
                 except:
                     pass
 
     def prev(self):
+        cur_idx = self.data_index
         while True:
-            cur_idx = self.data_index
             cur_idx = cur_idx - 1
             row_index_cand = np.where(self.data[:, 0, 0, -1] == cur_idx)[0]
             self.idx_data.setText(str(row_index_cand))
@@ -162,7 +179,7 @@ class MainDialog(QMainWindow, ui_files.gui.Ui_Dialog):
             else:
                 if len(row_index_cand) > 0:
                     try:
-                        self.row_index = np.where(self.data[:, 0, 0, -1] == cur_idx)[0][0]
+                        self.row_index = row_index_cand[0]
                         self.data_update(self.row_index)
                         break
                     except:
@@ -170,24 +187,24 @@ class MainDialog(QMainWindow, ui_files.gui.Ui_Dialog):
 
     def visualization(self):
         self.pred_plot.canvas.ax.clear()
-        ego_cur_pos = self.ego_hist[-1,:]
-        xmin = ego_cur_pos[0] - self.fov/2 + self.x_offset
-        xmax = ego_cur_pos[0] + self.fov/2 + self.x_offset
-        ymin = ego_cur_pos[1] - self.fov/2 + self.y_offset
-        ymax = ego_cur_pos[1] + self.fov/2 + self.y_offset
+        ego_cur_pos = self.ego_hist[-1, :]
+        xmin = ego_cur_pos[0] - self.fov / 2 + self.x_offset
+        xmax = ego_cur_pos[0] + self.fov / 2 + self.x_offset
+        ymin = ego_cur_pos[1] - self.fov / 2 + self.y_offset
+        ymax = ego_cur_pos[1] + self.fov / 2 + self.y_offset
         city_name = self.city
 
-        local_lane_polygons = am.find_local_lane_polygons([xmin-self.fov/2, xmax+self.fov/2, ymin-self.fov/2, ymax+self.fov/2], city_name)
+        local_lane_polygons = am.find_local_lane_polygons([xmin - self.fov / 2, xmax + self.fov / 2, ymin - self.fov / 2, ymax + self.fov / 2], city_name)
         draw_lane_polygons(self.pred_plot.canvas.ax, local_lane_polygons, color='darkgray')
 
-        ego_hist_x = self.ego_hist[:,0]
-        ego_hist_y = self.ego_hist[:,1]
-        ego_fut_x = self.ego_fut[:,0]
-        ego_fut_y = self.ego_fut[:,1]
-        target_hist_x = self.target_hist[:,0]
-        target_hist_y = self.target_hist[:,1]
-        target_fut_x = self.target_fut[:,0]
-        target_fut_y = self.target_fut[:,1]
+        ego_hist_x = self.ego_hist[:, 0]
+        ego_hist_y = self.ego_hist[:, 1]
+        ego_fut_x = self.ego_fut[:, 0]
+        ego_fut_y = self.ego_fut[:, 1]
+        target_hist_x = self.target_hist[:, 0]
+        target_hist_y = self.target_hist[:, 1]
+        target_fut_x = self.target_fut[:, 0]
+        target_fut_y = self.target_fut[:, 1]
 
         # cur_time = raw_data[ego_index[19]][0].split(',')[0]
         # cur_sur_index = [i for i, x in enumerate(time_stamp) if x == cur_time]
@@ -213,7 +230,6 @@ class MainDialog(QMainWindow, ui_files.gui.Ui_Dialog):
         self.pred_plot.canvas.ax.set_xlim([xmin.item(), xmax.item()])
         self.pred_plot.canvas.ax.set_ylim([ymin.item(), ymax.item()])
         self.pred_plot.canvas.draw()
-
 
         #
         # ego_aug = self.cur_data['ego_aug'][0]['traj'].numpy().copy()
@@ -490,23 +506,23 @@ class MainDialog(QMainWindow, ui_files.gui.Ui_Dialog):
         return ade_pred, fde_pred, ade_recon, fde_recon
 
     def data_reform(self):
+        print('original data is in progress')
         bar = progressbar.ProgressBar(maxval=100, \
                                       widgets=[progressbar.Bar('=', '[', ']'), ' ', progressbar.Percentage()])
         bar.start()
         data_list = np.empty([len(self.afl), 50, 2])
         self.data_idx_map = []
         for i in range(len(self.afl)):
-            bar.update(int(100*i/len(self.afl)))
+            bar.update(int(100 * i / len(self.afl)))
             data_tmp = self.afl[i]
             target_id = data_tmp.seq_df.TRACK_ID[data_tmp.seq_df.OBJECT_TYPE == 'AGENT'].tolist()[0]
             target_traj = np.concatenate([np.expand_dims(data_tmp.seq_df.X[data_tmp.seq_df.TRACK_ID == target_id].to_numpy(), axis=-1),
-                                         np.expand_dims(data_tmp.seq_df.Y[data_tmp.seq_df.TRACK_ID == target_id].to_numpy(), axis=-1)], axis=-1).astype(np.float32)
-            data_list[i,:,:] = target_traj
+                                          np.expand_dims(data_tmp.seq_df.Y[data_tmp.seq_df.TRACK_ID == target_id].to_numpy(), axis=-1)], axis=-1).astype(np.float32)
+            data_list[i, :, :] = target_traj
             self.data_idx_map.append(data_tmp.current_seq.stem)
         bar.finish()
         target_traj_translation = preprocess(data_list)
         self.target_traj_converted = preprocess_dir(target_traj_translation)
-
 
 
 def preprocess_dir(data):
@@ -523,6 +539,7 @@ def preprocess_dir(data):
             rot_data[i, j, :] = np.matmul(R, data[i, j, :])
     return rot_data
 
+
 def preprocess(data):
     k = len(data)
     trans_data = np.empty([k, 50, 2])
@@ -531,6 +548,7 @@ def preprocess(data):
         for j in range(50):
             trans_data[i, j, :] = data[i, j, :] - median
     return trans_data
+
 
 def sync(data):
     data_list = comm.allgather(data)
