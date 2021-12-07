@@ -46,8 +46,8 @@ class MainDialog(QMainWindow, ui_files.gui.Ui_Dialog):
         self.root_dir = os.getcwd()
         root = tkinter.Tk()
         root.withdraw()
-        # self.original_data_dir = tkinter.filedialog.askdirectory(title='Select directory for the original dataset', parent=root, initialdir=os.path.join(self.root_dir))
-        self.original_data_dir = '/home/jhs/Desktop/Bidirectional-Multi-view-Coding/bMVC/future_prediction_for_autonomous_vehicle/LaneGCN/dataset/val/data'
+        self.original_data_dir = tkinter.filedialog.askdirectory(title='Select directory for the original dataset', parent=root, initialdir=os.path.join(self.root_dir))
+        # self.original_data_dir = '/home/jhs/Desktop/Bidirectional-Multi-view-Coding/bMVC/future_prediction_for_autonomous_vehicle/LaneGCN/dataset/val/data'
         self.afl = ArgoverseForecastingLoader(self.original_data_dir)
 
         self.loadData.clicked.connect(self.data_load)
